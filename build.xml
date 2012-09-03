@@ -6,9 +6,11 @@
     <property name="version" value="0.0.1"/>
     <property name="src" location="src"/>
     <property name="build" location="build"/>
-    <property name="lib.compile" location="lib"/>
+    <property name="lib" location="lib"/>
     <property name="src.main.java" location="${src}/main/java"/>
+    <property name="src.test.java" location="${src}/test/java"/>
     <property name="build.main.java" location="${build}/jvm/classes"/>
+    <property name="build.test.java" location="${build}/test/classes"/>
     <property name="src.war.conf" location="${src}/main/webapp"/>
     <property name="dist"  location="dist"/>
 
@@ -19,9 +21,19 @@
         <fileset dir="${build.main.java}">
             <include name="**/*.class"/>
         </fileset>
-        <fileset dir="${lib.compile}">
+        <fileset dir="${lib}">
             <include name="**/*.jar"/>
             <exclude name="test/**.jar"/>
+        </fileset>
+    </path>
+
+    <path id="classpath.test">
+        <pathelement path="${classpath.compile}"/>
+        <fileset dir="${lib}">
+            <include name="test/**.jar"/>
+        </fileset>
+        <fileset dir="${dist}">
+            <include name="**.jar"/>
         </fileset>
     </path>
 
@@ -33,9 +45,10 @@
     </target>
 
     <target name="init">
-        <mkdir dir="${src.main.java}"/>
         <mkdir dir="${build.main.java}"/>
+        <mkdir dir="${build.test.java}"/>
         <pathconvert property="classpath.compile.prop" refid="classpath.compile" />
+        <pathconvert property="classpath.test.prop" refid="classpath.test" />
     </target>
 
     <target name="compile" depends="init">
@@ -47,14 +60,23 @@
             includeantruntime="false" />
     </target>
 
-    <target name="test" depends="compile">
+    <target name="test.compile">
+        <echo message="Compling with classpath=${classpath.test.prop}" />
+        <javac classpath="${classpath.test.prop}" 
+            srcdir="${src.test.java}"
+            destdir="${build.test.java}"
+            deprecation="on"
+            includeantruntime="false" />
+    </target>
+
+    <target name="test" depends="compile,test.compile">
     </target>
 
     <target name="dist" depends="compile">
         <war destfile="${dist}/HelloWorld-${version}-min.war" webxml="${src.war.conf}/WEB-INF/web.xml">
             <metainf file="${src.war.conf}/META-INF/context.xml"/>
             <classes dir="${build.main.java}"/>
-            <lib dir="${lib.compile}"/>
+            <lib dir="${lib}"/>
         </war>
     </target>
 
