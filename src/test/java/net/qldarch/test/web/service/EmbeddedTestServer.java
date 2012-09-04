@@ -5,7 +5,6 @@ import org.mortbay.jetty.Server;
 import org.mortbay.jetty.webapp.WebAppContext;
 
 public class EmbeddedTestServer extends ExternalResource {
-
     Server server;
     int port = 8080;
 
