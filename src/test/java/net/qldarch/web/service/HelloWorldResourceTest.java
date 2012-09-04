@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.net.URI;
 
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriBuilder;
 
 import org.junit.Rule;
@@ -27,7 +28,7 @@ public class HelloWorldResourceTest {
         URI uri = UriBuilder.fromPath("rest/hello").build();
         WebResource wr = client.resource(server.uri()).path(uri.getPath());
 
-        ClientResponse resp = wr.accept(MediaType.TEXT_PLAIN).get(ClientResource.class);
+        ClientResponse resp = wr.accept(MediaType.TEXT_PLAIN).get(ClientResponse.class);
 
         assertNotNull("Response must not be null", resp);
         assertEquals("Status", 200, resp.getStatus());

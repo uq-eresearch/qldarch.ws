@@ -28,7 +28,14 @@
     </path>
 
     <path id="classpath.test">
-        <pathelement path="${classpath.compile}"/>
+        <fileset dir="${build.main.java}">
+            <include name="**/*.class"/>
+        </fileset>
+        <fileset dir="${lib}">
+            <include name="**/*.jar"/>
+            <exclude name="test/**.jar"/>
+        </fileset>
+<!--        <pathelement path="${classpath.compile}"/> Not sure why this doesn't work -->
         <fileset dir="${lib}">
             <include name="test/**.jar"/>
         </fileset>
@@ -47,6 +54,7 @@
     <target name="init">
         <mkdir dir="${build.main.java}"/>
         <mkdir dir="${build.test.java}"/>
+        <mkdir dir="${dist}"/>
         <pathconvert property="classpath.compile.prop" refid="classpath.compile" />
         <pathconvert property="classpath.test.prop" refid="classpath.test" />
     </target>
@@ -70,6 +78,17 @@
     </target>
 
     <target name="test" depends="compile,test.compile">
+        <junit printsummary="yes" haltonfailure="yes" fork="yes">
+            <classpath>
+                <pathelement location="${build.test.java}"/>
+                <pathelement path="${classpath.test.prop}"/>
+            </classpath>
+            <batchtest fork="yes" todir="${reports.tests}">
+                <fileset dir="${build.test.java}">
+                    <include name="**/*Test.class"/>
+                </fileset>
+            </batchtest>
+        </junit>
     </target>
 
     <target name="dist" depends="compile">

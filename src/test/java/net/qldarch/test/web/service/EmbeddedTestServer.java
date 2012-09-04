@@ -1,8 +1,8 @@
 package net.qldarch.test.web.service;
 
 import org.junit.rules.ExternalResource;
-import org.mortbay.jetty.Server;
-import org.mortbay.jetty.webapp.WebAppContext;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 public class EmbeddedTestServer extends ExternalResource {
     Server server;
@@ -11,7 +11,7 @@ public class EmbeddedTestServer extends ExternalResource {
     @Override
     protected void before() throws Throwable {
         server = new Server(port);
-        server.addHandler(new WebAppContext("src/main/webapp", "/"));
+        server.setHandler(new WebAppContext("dist/HelloWorld-0.0.1-min.war", "/"));
         server.start();
     }
 
