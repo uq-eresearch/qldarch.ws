@@ -20,9 +20,6 @@
     <taskdef name="undeploy" classname="org.apache.catalina.ant.UndeployTask"/>
 
     <path id="classpath.compile">
-        <fileset dir="${build.main.java}">
-            <include name="**/*.class"/>
-        </fileset>
         <fileset dir="${lib}">
             <include name="**/*.jar"/>
             <exclude name="test/**.jar"/>
@@ -30,23 +27,14 @@
     </path>
 
     <path id="classpath.test">
-        <fileset dir="${build.main.java}">
-            <include name="**/*.class"/>
-        </fileset>
-        <fileset dir="${lib}">
-            <include name="**/*.jar"/>
-            <exclude name="test/**.jar"/>
-        </fileset>
-<!--        <pathelement path="${classpath.compile}"/> Not sure why this doesn't work -->
+        <path refid="classpath.compile"/>
+        <path location="${build.main.java}"/>
         <fileset dir="${lib}">
             <include name="test/**.jar"/>
         </fileset>
-        <fileset dir="${dist}">
-            <include name="**.jar"/>
-        </fileset>
     </path>
 
-    <target name="all" depends="init,compile,test,dist"/>
+    <target name="all" depends="init,compile,itest,dist"/>
 
     <target name="clean">
         <delete dir="${build}"/>
@@ -59,13 +47,12 @@
         <mkdir dir="${dist}"/>
         <mkdir dir="${test.dir}"/>
         <mkdir dir="${reports.dir}"/>
-        <pathconvert property="classpath.compile.prop" refid="classpath.compile" />
-        <pathconvert property="classpath.test.prop" refid="classpath.test" />
     </target>
 
     <target name="compile" depends="init">
+        <pathconvert pathsep="${line.separator}" property="classpath.compile.prop" refid="classpath.compile" />
         <echo message="Compling with classpath=${classpath.compile.prop}" />
-        <javac classpath="${classpath.compile.prop}" 
+        <javac classpathref="classpath.compile" 
             srcdir="${src.main.java}"
             destdir="${build.main.java}"
             deprecation="on"
@@ -73,20 +60,21 @@
     </target>
 
     <target name="test.compile">
+        <pathconvert pathsep="${line.separator}" property="classpath.test.prop" refid="classpath.test" />
         <echo message="Compling with classpath=${classpath.test.prop}" />
-        <javac classpath="${classpath.test.prop}" 
+        <javac classpathref="classpath.test" 
             srcdir="${src.test.java}"
             destdir="${build.test.java}"
             deprecation="on"
             includeantruntime="false" />
     </target>
 
-    <target name="test" depends="compile,test.compile,dist">
+    <target name="itest" depends="dist,test.compile">
         <junit printsummary="yes" haltonfailure="yes" fork="yes">
             <formatter type="brief"/>
             <classpath>
+                <path refid="classpath.test"/>
                 <pathelement location="${build.test.java}"/>
-                <pathelement path="${classpath.test.prop}"/>
             </classpath>
             <batchtest fork="yes" todir="${reports.dir}">
                 <fileset dir="${build.test.java}">
