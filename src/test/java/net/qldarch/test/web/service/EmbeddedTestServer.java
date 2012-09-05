@@ -7,11 +7,19 @@ import org.eclipse.jetty.webapp.WebAppContext;
 public class EmbeddedTestServer extends ExternalResource {
     Server server;
     int port = 8080;
+    String warFile;
+    String contextPath;
+
+    // FIXME: Should take dist/ from system property.
+    public EmbeddedTestServer(String warFile, String contextPath) {
+        this.warFile = warFile;
+        this.contextPath = contextPath;
+    }
 
     @Override
     protected void before() throws Throwable {
         server = new Server(port);
-        server.setHandler(new WebAppContext("dist/HelloWorld-0.0.1-min.war", "/"));
+        server.setHandler(new WebAppContext("dist/" + warFile, contextPath));
         server.start();
     }
 

@@ -4,3 +4,4 @@ dist/
 tags
 tmp/
 tomcat.properties
+test/reports

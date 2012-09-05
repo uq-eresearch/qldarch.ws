@@ -20,7 +20,8 @@ import net.qldarch.test.web.service.EmbeddedTestServer;
 public class HelloWorldResourceTest {
 
     @Rule
-    public EmbeddedTestServer server = new EmbeddedTestServer();
+    public EmbeddedTestServer server =
+        new EmbeddedTestServer("HelloWorld-0.0.1-min.war", "/");
 
     @Test
     public void shouldReturnHelloWorld() {
@@ -33,7 +34,7 @@ public class HelloWorldResourceTest {
         assertNotNull("Response must not be null", resp);
         assertEquals("Status", 200, resp.getStatus());
         assertTrue("Response contains entity", resp.hasEntity());
-        assertEquals("Response type text/plain", MediaType.TEXT_PLAIN, resp.hasEntity());
+        assertEquals("Response type text/plain", MediaType.TEXT_PLAIN_TYPE, resp.getType());
 
         String result = resp.getEntity(String.class);
 

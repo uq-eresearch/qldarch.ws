@@ -13,6 +13,8 @@
     <property name="build.test.java" location="${build}/test/classes"/>
     <property name="src.war.conf" location="${src}/main/webapp"/>
     <property name="dist"  location="dist"/>
+    <property name="test.dir" location="test"/>
+    <property name="reports.dir" location="${test.dir}/reports"/>
 
     <taskdef name="deploy" classname="org.apache.catalina.ant.DeployTask"/>
     <taskdef name="undeploy" classname="org.apache.catalina.ant.UndeployTask"/>
@@ -55,6 +57,8 @@
         <mkdir dir="${build.main.java}"/>
         <mkdir dir="${build.test.java}"/>
         <mkdir dir="${dist}"/>
+        <mkdir dir="${test.dir}"/>
+        <mkdir dir="${reports.dir}"/>
         <pathconvert property="classpath.compile.prop" refid="classpath.compile" />
         <pathconvert property="classpath.test.prop" refid="classpath.test" />
     </target>
@@ -77,13 +81,14 @@
             includeantruntime="false" />
     </target>
 
-    <target name="test" depends="compile,test.compile">
+    <target name="test" depends="compile,test.compile,dist">
         <junit printsummary="yes" haltonfailure="yes" fork="yes">
+            <formatter type="brief"/>
             <classpath>
                 <pathelement location="${build.test.java}"/>
                 <pathelement path="${classpath.test.prop}"/>
             </classpath>
-            <batchtest fork="yes" todir="${reports.tests}">
+            <batchtest fork="yes" todir="${reports.dir}">
                 <fileset dir="${build.test.java}">
                     <include name="**/*Test.class"/>
                 </fileset>
