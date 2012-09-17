@@ -9,6 +9,7 @@
     <property name="lib" location="lib"/>
     <property name="src.main.java" location="${src}/main/java"/>
     <property name="src.test.java" location="${src}/test/java"/>
+    <property name="src.test.resources" location="${src}/test/resources"/>
     <property name="build.main.java" location="${build}/jvm/classes"/>
     <property name="build.test.java" location="${build}/test/classes"/>
     <property name="src.war.conf" location="${src}/main/webapp"/>
@@ -29,6 +30,7 @@
     <path id="classpath.test">
         <path refid="classpath.compile"/>
         <path location="${build.main.java}"/>
+        <path location="${src.main.resources}"/>
         <fileset dir="${lib}">
             <include name="test/**.jar"/>
         </fileset>
