@@ -17,10 +17,10 @@
     <property name="test.dir" location="test"/>
     <property name="reports.dir" location="${test.dir}/reports"/>
 
-    <!--
-    <taskdef name="deploy" classname="org.apache.catalina.ant.DeployTask"/>
-    <taskdef name="undeploy" classname="org.apache.catalina.ant.UndeployTask"/>
-    -->
+    <taskdef name="deploy" classname="org.apache.catalina.ant.DeployTask"
+        classpath="${tomcat.install.path}/lib/catalina-ant.jar"/>
+    <taskdef name="undeploy" classname="org.apache.catalina.ant.UndeployTask"
+        classpath="${tomcat.install.path}/lib/catalina-ant.jar"/>
 
     <path id="classpath.compile">
         <fileset dir="${lib}">
@@ -90,14 +90,17 @@
 
     <target name="dist" depends="compile">
         <war destfile="${dist}/HelloWorld-${version}-min.war" webxml="${src.war.conf}/WEB-INF/web.xml">
-            <metainf file="${src.war.conf}/META-INF/context.xml"/>
+            <!--            <metainf file="${src.war.conf}/META-INF/context.xml"/> -->
             <classes dir="${build.main.java}"/>
             <lib dir="${lib}"/>
         </war>
     </target>
 
-    <!--
     <target name="deploy" depends="dist,undeploy">
+        <echo message="URL: ${tomcat.manager.url}" />
+        <echo message="username: ${tomcat.manager.username}" />
+        <echo message="password: ${tomcat.manager.password}" />
+        <echo message="path: ${tomcat.deploy.path}" />
         <deploy url="${tomcat.manager.url}"
             username="${tomcat.manager.username}"
             password="${tomcat.manager.password}"
@@ -112,5 +115,4 @@
             path="/${tomcat.deploy.path}"
             failonerror="false" />
     </target>
-    -->
 </project>

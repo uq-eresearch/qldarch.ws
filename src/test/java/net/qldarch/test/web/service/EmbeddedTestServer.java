@@ -6,7 +6,7 @@ import org.eclipse.jetty.webapp.WebAppContext;
 
 public class EmbeddedTestServer extends ExternalResource {
     Server server;
-    int port = 8080;
+    int port = 8888;
     String warFile;
     String contextPath;
 
