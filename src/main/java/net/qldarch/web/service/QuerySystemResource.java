@@ -35,7 +35,11 @@ public class QuerySystemResource {
             myRepository.initialize();
 
             RepositoryConnection conn = myRepository.getConnection();
-            String query = "SELECT ?s ?p ?o WHERE { ?s ?p ?o. }";
+            String query =
+                "select ?s ?p ?o" +
+                "from <http://qldarch.net/ns/rdf/2012/06/terms#>" +
+                "where { ?s rdf:type owl:DatatypeProperty. ?s ?p ?o. }";
+
             pw.print("Result: \n");
             try {
                 TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
