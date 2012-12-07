@@ -94,25 +94,10 @@
             <classes dir="${build.main.java}"/>
             <lib dir="${lib}"/>
         </war>
+        <move file="${dist}/HelloWorld-${version}-min.war" tofile="${dist}/ws.war" />
     </target>
 
-    <target name="deploy" depends="dist,undeploy">
-        <echo message="URL: ${tomcat.manager.url}" />
-        <echo message="username: ${tomcat.manager.username}" />
-        <echo message="password: ${tomcat.manager.password}" />
-        <echo message="path: ${tomcat.deploy.path}" />
-        <deploy url="${tomcat.manager.url}"
-            username="${tomcat.manager.username}"
-            password="${tomcat.manager.password}"
-            path="/${tomcat.deploy.path}"
-            war="${dist}/HelloWorld-${version}-min.war" />
-    </target>
-
-    <target name="undeploy" depends="">
-        <undeploy url="${tomcat.manager.url}"
-            username="${tomcat.manager.username}"
-            password="${tomcat.manager.password}"
-            path="/${tomcat.deploy.path}"
-            failonerror="false" />
+    <target name="deploy" depends="dist">
+        <copy file="${dist}/ws.war" tofile="${tomcat.install.path}/webapps/${tomcat.deploy.path}.war" />
     </target>
 </project>
