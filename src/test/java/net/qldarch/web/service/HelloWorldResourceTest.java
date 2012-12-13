@@ -1,4 +1,4 @@
-package net.qldarch.test.web.service;
+package net.qldarch.web.service;
 
 import static org.junit.Assert.*;
 
@@ -21,7 +21,7 @@ public class HelloWorldResourceTest {
 
     @Rule
     public EmbeddedTestServer server =
-        new EmbeddedTestServer("HelloWorld-0.0.1-min.war", "/");
+        new EmbeddedTestServer("ws.war", "/");
 
     @Test
     public void shouldReturnHelloWorld() {
