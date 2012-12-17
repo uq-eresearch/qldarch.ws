@@ -1,10 +1,10 @@
 #Processed by Id: euler.yap 5820 2012-11-27 15:29:04Z josd
-#eye --yap --nope /opt/euler/rdfs-subClassOf.n3 /opt/euler/rdfs-subPropertyOf.n3 ArchitectureOntology.ttl --pass
+#eye --yap --nope ArchitectureOntology.ttl /opt/euler/rdfs-subClassOf.n3 --pass
 
-@prefix log: <http://www.w3.org/2000/10/swap/log#>.
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
 @prefix : <http://qldarch.net/ns/rdf/2012-06/terms#>.
+@prefix qaat: <http://qldarch.net/ns/omeka/2012-11/auxterms#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix owl: <http://www.w3.org/2002/07/owl#>.
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
 @prefix dcterms: <http://purl.org/dc/terms/>.
@@ -12,6 +12,7 @@
 @prefix foaf: <http://xmlns.com/foaf/0.1/>.
 @prefix skos: <http://www.w3.org/2004/02/skos/core#>.
 @prefix geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>.
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
 @prefix var: <http://localhost/var#>.
 @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#>.
 @prefix r: <http://www.w3.org/2000/10/swap/reason#>.
@@ -31,6 +32,7 @@
 :DigitalObject a owl:Class.
 :StructureOrAgent a owl:Class.
 :Structure a owl:Class.
+:BuildingTypology a owl:Class.
 <http://xmlns.com/foaf/0.1/Agent> a owl:Class.
 <http://xmlns.com/foaf/0.1/Person> a owl:Class.
 :Architect a owl:Class.
@@ -38,8 +40,11 @@
 :Photograph a owl:Class.
 :LineDrawing a owl:Class.
 :Interview a owl:Class.
+:Format a owl:Class.
+:DrawingType a owl:Class.
 :identifier a owl:DatatypeProperty.
 :label a owl:DatatypeProperty.
+qaat:label a owl:DatatypeProperty.
 rdfs:label a owl:DatatypeProperty.
 rdf:type a owl:DatatypeProperty.
 <http://xmlns.com/foaf/0.1/firstName> a owl:DatatypeProperty.
@@ -50,6 +55,7 @@ rdf:type a owl:DatatypeProperty.
 :taughtBy a owl:ObjectProperty.
 :mentoredBy a owl:ObjectProperty.
 :hasPartner a owl:ObjectProperty.
+<http://purl.org/dc/terms/created> a owl:ObjectProperty.
 <http://purl.org/dc/terms/creator> a owl:ObjectProperty.
 <http://purl.org/dc/terms/title> a owl:DatatypeProperty.
 <http://purl.org/dc/terms/description> a owl:DatatypeProperty.
@@ -59,12 +65,19 @@ rdf:type a owl:DatatypeProperty.
 :interviewer a owl:ObjectProperty.
 :interviewee a owl:ObjectProperty.
 :transcriber a owl:ObjectProperty.
+qaat:location a owl:DatatypeProperty.
+:datePhotographed a owl:DatatypeProperty.
+:sourceFilename a owl:DatatypeProperty.
+qaat:projectNumber a owl:DatatypeProperty.
+qaat:dateOriginalCreation a owl:DatatypeProperty.
+qaat:photographer a owl:DatatypeProperty.
 :Entity a rdfs:Class.
 :NonDigitalThing a rdfs:Class.
 :DigitalThing a rdfs:Class.
 :DigitalObject a rdfs:Class.
 :StructureOrAgent a rdfs:Class.
 :Structure a rdfs:Class.
+:BuildingTypology a rdfs:Class.
 <http://xmlns.com/foaf/0.1/Agent> a rdfs:Class.
 <http://xmlns.com/foaf/0.1/Person> a rdfs:Class.
 :Architect a rdfs:Class.
@@ -72,6 +85,8 @@ rdf:type a owl:DatatypeProperty.
 :Photograph a rdfs:Class.
 :LineDrawing a rdfs:Class.
 :Interview a rdfs:Class.
+:Format a rdfs:Class.
+:DrawingType a rdfs:Class.
 :label a rdf:Property.
 :display a rdf:Property.
 :editable a rdf:Property.
@@ -79,17 +94,19 @@ rdf:type a owl:DatatypeProperty.
 :reifiedAs a rdf:Property.
 :toplevel a rdf:Property.
 :displayPrecedence a rdf:Property.
-:preferredImage a rdfs:Property.
-:employedBy a rdfs:Property.
-:taughtBy a rdfs:Property.
-:mentoredBy a rdfs:Property.
-:hasPartner a rdfs:Property.
-<http://purl.org/dc/terms/creator> a rdfs:Property.
-:hasSubject a rdfs:Property.
-:interviewer a rdfs:Property.
-:interviewee a rdfs:Property.
-:transcriber a rdfs:Property.
+:preferredImage a rdf:Property.
+:employedBy a rdf:Property.
+:taughtBy a rdf:Property.
+:mentoredBy a rdf:Property.
+:hasPartner a rdf:Property.
+<http://purl.org/dc/terms/created> a rdf:Property.
+<http://purl.org/dc/terms/creator> a rdf:Property.
+:hasSubject a rdf:Property.
+:interviewer a rdf:Property.
+:interviewee a rdf:Property.
+:transcriber a rdf:Property.
 :identifier a rdf:Property.
+qaat:label a rdf:Property.
 rdfs:label a rdf:Property.
 rdf:type a rdf:Property.
 <http://xmlns.com/foaf/0.1/firstName> a rdf:Property.
@@ -99,14 +116,21 @@ rdf:type a rdf:Property.
 <http://purl.org/dc/terms/description> a rdf:Property.
 <http://purl.org/dc/terms/rights> a rdf:Property.
 :systemLocation a rdf:Property.
+qaat:location a rdf:Property.
+:datePhotographed a rdf:Property.
+:sourceFilename a rdf:Property.
+qaat:projectNumber a rdf:Property.
+qaat:dateOriginalCreation a rdf:Property.
+qaat:photographer a rdf:Property.
 owl:Class rdfs:subClassOf rdfs:Class.
 owl:AnnotationProperty rdfs:subClassOf rdf:Property.
-owl:ObjectProperty rdfs:subClassOf rdfs:Property.
+owl:ObjectProperty rdfs:subClassOf rdf:Property.
 owl:DatatypeProperty rdfs:subClassOf rdf:Property.
 :NonDigitalThing rdfs:subClassOf :Entity.
 :DigitalObject rdfs:subClassOf :DigitalThing.
 :StructureOrAgent rdfs:subClassOf :NonDigitalThing.
 :Structure rdfs:subClassOf :StructureOrAgent.
+:BuildingTypology rdfs:subClassOf :NonDigitalThing.
 <http://xmlns.com/foaf/0.1/Agent> rdfs:subClassOf :StructureOrAgent.
 <http://xmlns.com/foaf/0.1/Person> rdfs:subClassOf <http://xmlns.com/foaf/0.1/Agent>.
 :Architect rdfs:subClassOf <http://xmlns.com/foaf/0.1/Person>.
@@ -114,10 +138,13 @@ owl:DatatypeProperty rdfs:subClassOf rdf:Property.
 :Photograph rdfs:subClassOf :DigitalObject.
 :LineDrawing rdfs:subClassOf :DigitalObject.
 :Interview rdfs:subClassOf :DigitalObject.
+:Format rdfs:subClassOf :DigitalThing.
+:DrawingType rdfs:subClassOf :DigitalThing.
 :hasSubject rdfs:subClassOf <http://purl.org/dc/terms/subject>.
 :StructureOrAgent rdfs:subClassOf :Entity.
 :Structure rdfs:subClassOf :NonDigitalThing.
 :Structure rdfs:subClassOf :Entity.
+:BuildingTypology rdfs:subClassOf :Entity.
 <http://xmlns.com/foaf/0.1/Agent> rdfs:subClassOf :NonDigitalThing.
 <http://xmlns.com/foaf/0.1/Agent> rdfs:subClassOf :Entity.
 <http://xmlns.com/foaf/0.1/Person> rdfs:subClassOf :StructureOrAgent.
@@ -144,13 +171,25 @@ owl:DatatypeProperty rdfs:domain rdfs:Resource.
 :interviewer rdfs:domain :Interview.
 :interviewee rdfs:domain :Interview.
 :transcriber rdfs:domain :Transcript.
+qaat:location rdfs:domain :DigitalObject.
+:datePhotographed rdfs:domain :DigitalObject.
+:sourceFilename rdfs:domain :DigitalObject.
+qaat:projectNumber rdfs:domain :DigitalObject.
+qaat:dateOriginalCreation rdfs:domain :DigitalObject.
+qaat:photographer rdfs:domain :Photograph.
 :hasSubject rdfs:domain :DigitalThing.
 <http://purl.org/dc/terms/rights> rdfs:domain :DigitalThing.
 :systemLocation rdfs:domain :DigitalThing.
+qaat:location rdfs:domain :DigitalThing.
+:datePhotographed rdfs:domain :DigitalThing.
+:sourceFilename rdfs:domain :DigitalThing.
+qaat:projectNumber rdfs:domain :DigitalThing.
+qaat:dateOriginalCreation rdfs:domain :DigitalThing.
 :taughtBy rdfs:domain <http://xmlns.com/foaf/0.1/Agent>.
 :mentoredBy rdfs:domain <http://xmlns.com/foaf/0.1/Agent>.
 :employedBy rdfs:domain <http://xmlns.com/foaf/0.1/Agent>.
 :hasPartner rdfs:domain <http://xmlns.com/foaf/0.1/Agent>.
+qaat:photographer rdfs:domain :DigitalObject.
 :interviewer rdfs:domain :DigitalObject.
 :interviewee rdfs:domain :DigitalObject.
 :taughtBy rdfs:domain :NonDigitalThing.
@@ -165,6 +204,7 @@ owl:DatatypeProperty rdfs:domain rdfs:Resource.
 :mentoredBy rdfs:domain :StructureOrAgent.
 :employedBy rdfs:domain :StructureOrAgent.
 :hasPartner rdfs:domain :StructureOrAgent.
+qaat:photographer rdfs:domain :DigitalThing.
 :interviewer rdfs:domain :DigitalThing.
 :interviewee rdfs:domain :DigitalThing.
 owl:DatatypeProperty rdfs:range rdfs:Literal.
@@ -208,27 +248,26 @@ owl:DatatypeProperty rdfs:range rdfs:Literal.
 :label rdfs:subPropertyOf rdfs:label.
 :Entity rdfs:comment "Top for concepts related by this vocabularly".
 :DigitalObject rdfs:comment "This will be replaced by a reconciliation with FRBR Work/Expression distinction".
+qaat:label rdfs:comment "Temporary placeholder for property that should become a SKOS concept.".
 <http://purl.org/dc/terms/rights> rdfs:comment "Currently a plain text statement of IP status of the work. If required can model this further".
 :DigitalThing rdfs:subClassof :Entity.
 :Structure :displayPrecedence 2 .
+:BuildingTypology :displayPrecedence 3 .
 :Architect :displayPrecedence 0 .
 :Firm :displayPrecedence 1 .
 :Photograph :displayPrecedence 1 .
 :LineDrawing :displayPrecedence 2 .
 :Interview :displayPrecedence 0 .
-:Structure :toplevel true .
-:Architect :toplevel true .
-:Firm :toplevel true .
-:Photograph :toplevel true .
-:LineDrawing :toplevel true .
-:Interview :toplevel true .
-<http://xmlns.com/foaf/0.1/Agent> rdfs:isDefinedBy <http://http://xmlns.com/foaf/spec/#term_Agent>.
-<http://xmlns.com/foaf/0.1/Person> rdfs:isDefinedBy <http://http://xmlns.com/foaf/spec/#term_Person>.
-<http://purl.org/dc/terms/creator> rdfs:isDefinedBy <http://purl.org/dc/terms/creator>.
-<http://purl.org/dc/terms/title> rdfs:isDefinedBy <http://purl.org/dc/terms/title>.
-<http://purl.org/dc/terms/description> rdfs:isDefinedBy <http://purl.org/dc/terms/description>.
+:Structure :label "Structures".
+:BuildingTypology :label "Building Typologies".
+:Architect :label "Architects".
+:Firm :label "Firms".
+:Photograph :label "Photographs".
+:LineDrawing :label "Line Drawings".
+:Interview :label "Interviews".
 :identifier :label "System Identifier".
 :label :label "The preferred label for a thing".
+qaat:label :label "A label for a concept from a controlled vocab".
 rdfs:label :label "A label for a thing".
 rdf:type :label "A label for a thing".
 <http://xmlns.com/foaf/0.1/firstName> :label "First Name".
@@ -239,6 +278,7 @@ rdf:type :label "A label for a thing".
 :taughtBy :label "Taught By".
 :mentoredBy :label "Mentored By".
 :hasPartner :label "Has Partner".
+<http://purl.org/dc/terms/created> :label "Created".
 <http://purl.org/dc/terms/creator> :label "Creator".
 <http://purl.org/dc/terms/title> :label "Title".
 <http://purl.org/dc/terms/description> :label "Description".
@@ -248,8 +288,28 @@ rdf:type :label "A label for a thing".
 :interviewer :label "Interviewer".
 :interviewee :label "Interviewee".
 :transcriber :label "Transcriber".
+qaat:location :label "Location of Subject".
+:datePhotographed :label "Date Photographed".
+:sourceFilename :label "Source Filename".
+qaat:projectNumber :label "Project Number".
+qaat:dateOriginalCreation :label "Original Creation Date".
+qaat:photographer :label "Photographer".
+:Structure :toplevel true .
+:BuildingTypology :toplevel true .
+:Architect :toplevel true .
+:Firm :toplevel true .
+:Photograph :toplevel true .
+:LineDrawing :toplevel true .
+:Interview :toplevel true .
+<http://xmlns.com/foaf/0.1/Agent> rdfs:isDefinedBy <http://http://xmlns.com/foaf/spec/#term_Agent>.
+<http://xmlns.com/foaf/0.1/Person> rdfs:isDefinedBy <http://http://xmlns.com/foaf/spec/#term_Person>.
+<http://purl.org/dc/terms/created> rdfs:isDefinedBy <http://purl.org/dc/terms/created>.
+<http://purl.org/dc/terms/creator> rdfs:isDefinedBy <http://purl.org/dc/terms/creator>.
+<http://purl.org/dc/terms/title> rdfs:isDefinedBy <http://purl.org/dc/terms/title>.
+<http://purl.org/dc/terms/description> rdfs:isDefinedBy <http://purl.org/dc/terms/description>.
 :identifier :display false .
 :label :display false .
+qaat:label :display false .
 rdfs:label :display true .
 rdf:type :display false .
 <http://xmlns.com/foaf/0.1/firstName> :display true .
@@ -260,6 +320,7 @@ rdf:type :display false .
 :taughtBy :display true .
 :mentoredBy :display true .
 :hasPartner :display true .
+<http://purl.org/dc/terms/created> :display false .
 <http://purl.org/dc/terms/creator> :display true .
 <http://purl.org/dc/terms/title> :display true .
 <http://purl.org/dc/terms/description> :display true .
@@ -269,8 +330,15 @@ rdf:type :display false .
 :interviewer :display true .
 :interviewee :display true .
 :transcriber :display true .
+qaat:location :display true .
+:datePhotographed :display true .
+:sourceFilename :display false .
+qaat:projectNumber :display false .
+qaat:dateOriginalCreation :display true .
+qaat:photographer :display true .
 :identifier :editable false .
 :label :editable true .
+qaat:label :editable false .
 rdfs:label :editable true .
 rdf:type :editable false .
 <http://xmlns.com/foaf/0.1/firstName> :editable true .
@@ -281,6 +349,7 @@ rdf:type :editable false .
 :taughtBy :editable false .
 :mentoredBy :editable false .
 :hasPartner :editable false .
+<http://purl.org/dc/terms/created> :editable false .
 <http://purl.org/dc/terms/creator> :editable false .
 <http://purl.org/dc/terms/title> :editable false .
 <http://purl.org/dc/terms/description> :editable false .
@@ -290,32 +359,17 @@ rdf:type :editable false .
 :interviewer :editable false .
 :interviewee :editable false .
 :transcriber :editable false .
+qaat:location :editable false .
+:datePhotographed :editable false .
+:sourceFilename :editable false .
+qaat:projectNumber :editable false .
+qaat:dateOriginalCreation :editable false .
+qaat:photographer :editable false .
 :identifier :shortName "uri".
 :label :shortName "label".
 rdfs:label :shortName "altlabel".
 :preferredImage :shortName "preferredImage".
 :employedBy :reifiedAs :EmploymentRelation.
-:identifier rdfs:label "System Identifier".
-:label rdfs:label "The preferred label for a thing".
-rdfs:label rdfs:label "A label for a thing".
-rdf:type rdfs:label "A label for a thing".
-<http://xmlns.com/foaf/0.1/firstName> rdfs:label "First Name".
-<http://xmlns.com/foaf/0.1/lastName> rdfs:label "Last Name".
-:firmName rdfs:label "Firm Name".
-:preferredImage rdfs:label "Preferred Image".
-:employedBy rdfs:label "Employed By".
-:taughtBy rdfs:label "Taught By".
-:mentoredBy rdfs:label "Mentored By".
-:hasPartner rdfs:label "Has Partner".
-<http://purl.org/dc/terms/creator> rdfs:label "Creator".
-<http://purl.org/dc/terms/title> rdfs:label "Title".
-<http://purl.org/dc/terms/description> rdfs:label "Description".
-:hasSubject rdfs:label "Has Subject".
-<http://purl.org/dc/terms/rights> rdfs:label "Rights".
-:systemLocation rdfs:label "System Location".
-:interviewer rdfs:label "Interviewer".
-:interviewee rdfs:label "Interviewee".
-:transcriber rdfs:label "Transcriber".
 
-#ENDS 14 [msec] TC=429 TP=964 BC=0 BP=513 PM=0 CM=0 FM=0 AM=0
+#ENDS 17 [msec] TC=480 TP=1067 BC=0 BP=565 PM=0 CM=0 FM=0 AM=0
 

@@ -36,6 +36,10 @@ public class SparqlToJsonString {
         }
     }
 
+    public String cleanString(String in) {
+        return in.replaceAll("\n", "").replaceAll("\r", "");
+    }
+
     public String performQuery(String query) {
         StringWriter sw = new StringWriter();
         PrintWriter pw = new PrintWriter(sw);
@@ -79,13 +83,9 @@ public class SparqlToJsonString {
 
                     Map<String, Value> propertyMap = propertyGraph.get(str);
                     pw.println("    \"" + str + "\": {");
-                    boolean firstb = true;
+                    pw.print("        \"uri\": \"" + str + "\"");
                     for (String prop : propertyMap.keySet()) {
-                        if (!firstb) {
-                            pw.println(",");
-                        } else {
-                            firstb = false;
-                        }
+                        pw.println(",");
 
                         Value v = propertyMap.get(prop);
                         pw.print("        \"" + prop + "\": ");
@@ -97,10 +97,10 @@ public class SparqlToJsonString {
                             } else if (datatype.equals(XSD_INTEGER)) {
                                 pw.print(l.integerValue().intValue()); // Note: This truncates, but I don't have time to fix that atm.
                             } else {
-                                pw.print(l.toString());
+                                pw.print("\"" + cleanString(l.getLabel()) + "\"");
                             }
                         } else {
-                            pw.print("\"" + v.toString() + "\"");
+                            pw.print("\"" + cleanString(v.toString()) + "\"");
                         }
                     }
                     pw.print("\n    }");

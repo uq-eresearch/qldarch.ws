@@ -77,11 +77,13 @@ owl:DatatypeProperty rdfs:subClassOf rdf:Property ;
 :Structure a owl:Class ;
     rdfs:subClassOf :StructureOrAgent ;
     :displayPrecedence 2 ;
+    :label "Structures" ;
     :toplevel true .
 
 :BuildingTypology a owl:Class ;
     rdfs:subClassOf :NonDigitalThing ;
     :displayPrecedence 3 ;
+    :label "Building Typologies" ;
     :toplevel true .
 
 foaf:Agent a owl:Class ;
@@ -95,26 +97,31 @@ foaf:Person a owl:Class ;
 :Architect a owl:Class ;
     rdfs:subClassOf foaf:Person ;
     :displayPrecedence 0 ;
+    :label "Architects" ;
     :toplevel true .
 
 :Firm a owl:Class ;
     rdfs:subClassOf foaf:Agent ;
     :displayPrecedence 1 ;
+    :label "Firms" ;
     :toplevel true .
 
 :Photograph a owl:Class ;
     rdfs:subClassOf :DigitalObject ;
     :displayPrecedence 1 ;
+    :label "Photographs" ;
     :toplevel true .
 
 :LineDrawing a owl:Class ;
     rdfs:subClassOf :DigitalObject ;
     :displayPrecedence 2 ;
+    :label "Line Drawings" ;
     :toplevel true .
 
 :Interview a owl:Class ;
     rdfs:subClassOf :DigitalObject ;
     :displayPrecedence 0 ;
+    :label "Interviews" ;
     :toplevel true .
 
 :Format a owl:Class ;
@@ -294,19 +301,19 @@ qaat:location a owl:DatatypeProperty ;
     :editable false ;
     rdfs:domain :DigitalObject .
 
-qldarch:datePhotographed a owl:DatatypeProperty ;
+:datePhotographed a owl:DatatypeProperty ;
     :label "Date Photographed" ;
     :display true ;
     :editable false ;
     rdfs:domain :DigitalObject .
 
-qldarch:sourceFilename a owl:DatatypeProperty ;
+:sourceFilename a owl:DatatypeProperty ;
     :label "Source Filename" ;
     :display false ;
     :editable false ;
     rdfs:domain :DigitalObject .
 
-qldarch:systemLocation a owl:DatatypeProperty ;
+:systemLocation a owl:DatatypeProperty ;
     :label "System Location" ;
     :display false ;
     :editable false ;

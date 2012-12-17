@@ -1,0 +1,3 @@
+#!/bin/bash
+
+/opt/euler/eye --yap --nope ArchitectureOntology.ttl /opt/euler/rdfs-subClassOf.n3 --pass | ./fixbools > ArchitectureOntologyInferredFixed.ttl
