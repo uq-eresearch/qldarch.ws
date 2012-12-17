@@ -86,7 +86,7 @@ map:articles a d2rq:ClassMap;
 map:lineDrawings a d2rq:ClassMap;
 	d2rq:dataStorage map:database;
 	d2rq:uriPattern "http://qldarch.net/omeka/items/show/@@o_items.id@@";
-	d2rq:class qldarch:Drawing;
+	d2rq:class qldarch:LineDrawing;
     d2rq:containsDuplicates "true";
     d2rq:join "o_item_types.id <= o_items.item_type_id";
     d2rq:condition "o_item_types.name='Line Drawing'"
@@ -229,15 +229,15 @@ map:dateSubmitted a d2rq:PropertyBridge;
     d2rq:datatype xsd:date;
     d2rq:column "o_items.modified"
     .
-map:originalFileName a d2rq:PropertyBridge;
+map:originalFilename a d2rq:PropertyBridge;
 	d2rq:dataStorage map:database;
     d2rq:belongsToClassMap map:digitalObjects;
-    d2rq:property qldarch:sourceFileName;
+    d2rq:property qldarch:sourceFilename;
     d2rq:datatype xsd:string;
     d2rq:column "o_files.original_filename";
     d2rq:join "o_items.id <= o_files.item_id"
     .
-map:systemFileName a d2rq:PropertyBridge;
+map:systemFilename a d2rq:PropertyBridge;
 	d2rq:dataStorage map:database;
     d2rq:belongsToClassMap map:digitalObjects;
     d2rq:property qldarch:systemLocation;
@@ -245,22 +245,13 @@ map:systemFileName a d2rq:PropertyBridge;
     d2rq:column "o_files.archive_filename";
     d2rq:join "o_items.id <= o_files.item_id"
     .
-map:systemFileName a d2rq:PropertyBridge;
+map:systemFilename a d2rq:PropertyBridge;
 	d2rq:dataStorage map:database;
     d2rq:belongsToClassMap map:digitalObjects;
     d2rq:property qldarch:systemLocation;
     d2rq:datatype xsd:string;
     d2rq:column "o_files.archive_filename";
     d2rq:join "o_items.id <= o_files.item_id"
-    .
-map:submitter a d2rq:PropertyBridge;
-	d2rq:dataStorage map:database;
-    d2rq:belongsToClassMap map:digitalObjects;
-    d2rq:property qldarch:submitter;
-    d2rq:refersToClassMap map:submitters;
-    d2rq:join "o_items.id <= o_entities_relations.relation_id";
-    d2rq:join "o_entity_relationships.id <= o_entities_relations.relationship_id";
-    d2rq:condition "o_entity_relationships.name='added'"
     .
 
 # Dublin Core Metadata
@@ -420,7 +411,7 @@ map:buildingTypology a d2rq:PropertyBridge;
 map:photographer a d2rq:PropertyBridge;
 	d2rq:dataStorage map:database;
     d2rq:belongsToClassMap map:digitalObjects;
-    d2rq:property qldarch:photographer;
+    d2rq:property qaat:photographer;
     d2rq:datatype xsd:string;
     d2rq:column "o_element_texts.text";
     d2rq:join "o_elements.id <= o_element_texts.element_id";
@@ -432,7 +423,7 @@ map:photographer a d2rq:PropertyBridge;
 map:datePhotographed a d2rq:PropertyBridge;
 	d2rq:dataStorage map:database;
     d2rq:belongsToClassMap map:digitalObjects;
-    d2rq:property qldarch:datePhotograph;
+    d2rq:property qldarch:datePhotographed;
     d2rq:datatype xsd:date;
     d2rq:column "o_element_texts.text";
     d2rq:join "o_elements.id <= o_element_texts.element_id";

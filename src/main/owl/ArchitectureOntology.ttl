@@ -7,6 +7,7 @@
 @base <http://qldarch.net/ns/rdf/2012/06/terms#> .
 
 @prefix : <http://qldarch.net/ns/rdf/2012-06/terms#> .
+@prefix qaat: <http://qldarch.net/ns/omeka/2012-11/auxterms#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -32,12 +33,11 @@ owl:Class rdfs:subClassOf rdfs:Class .
 
 owl:AnnotationProperty rdfs:subClassOf rdf:Property .
 
-owl:ObjectProperty rdfs:subClassOf rdfs:Property .
+owl:ObjectProperty rdfs:subClassOf rdf:Property .
 
 owl:DatatypeProperty rdfs:subClassOf rdf:Property ;
     rdfs:domain rdfs:Resource ;
     rdfs:range rdfs:Literal .
-
 
 #
 # Annotation Properties
@@ -79,6 +79,11 @@ owl:DatatypeProperty rdfs:subClassOf rdf:Property ;
     :displayPrecedence 2 ;
     :toplevel true .
 
+:BuildingTypology a owl:Class ;
+    rdfs:subClassOf :NonDigitalThing ;
+    :displayPrecedence 3 ;
+    :toplevel true .
+
 foaf:Agent a owl:Class ;
     rdfs:isDefinedBy <http://http://xmlns.com/foaf/spec/#term_Agent> ;
     rdfs:subClassOf :StructureOrAgent .
@@ -112,6 +117,13 @@ foaf:Person a owl:Class ;
     :displayPrecedence 0 ;
     :toplevel true .
 
+:Format a owl:Class ;
+    rdfs:subClassOf :DigitalThing .
+
+:DrawingType a owl:Class ; 
+    rdfs:subClassOf :DigitalThing .
+
+
 #
 # Places
 #
@@ -131,6 +143,12 @@ foaf:Person a owl:Class ;
     :display false ;
     :editable true ;
     :shortName "label" .
+
+qaat:label a owl:DatatypeProperty ;
+    :label "A label for a concept from a controlled vocab" ;
+    :display false ;
+    :editable false ;
+    rdfs:comment "Temporary placeholder for property that should become a SKOS concept." .
 
 rdfs:label a owl:DatatypeProperty ;
     :label "A label for a thing" ;
@@ -203,6 +221,12 @@ foaf:lastName a owl:DatatypeProperty ;
     rdfs:domain :Firm ;
     rdfs:range foaf:Person .
 
+dcterms:created a owl:ObjectProperty ;
+    :label "Created" ;
+    :display false ;
+    :editable false ;
+    rdfs:isDefinedBy dcterms:created .
+
 dcterms:creator a owl:ObjectProperty ;
     :label "Creator" ;
     :display true ;
@@ -263,5 +287,47 @@ dcterms:rights a owl:DatatypeProperty ;
     :editable false ;
     rdfs:domain :Transcript ;
     rdfs:range foaf:Person .
+
+qaat:location a owl:DatatypeProperty ;
+    :label "Location of Subject" ;
+    :display true ;
+    :editable false ;
+    rdfs:domain :DigitalObject .
+
+qldarch:datePhotographed a owl:DatatypeProperty ;
+    :label "Date Photographed" ;
+    :display true ;
+    :editable false ;
+    rdfs:domain :DigitalObject .
+
+qldarch:sourceFilename a owl:DatatypeProperty ;
+    :label "Source Filename" ;
+    :display false ;
+    :editable false ;
+    rdfs:domain :DigitalObject .
+
+qldarch:systemLocation a owl:DatatypeProperty ;
+    :label "System Location" ;
+    :display false ;
+    :editable false ;
+    rdfs:domain :DigitalObject .
+
+qaat:projectNumber a owl:DatatypeProperty ;
+    :label "Project Number" ;
+    :display false ;
+    :editable false ;
+    rdfs:domain :DigitalObject .
+
+qaat:dateOriginalCreation a owl:DatatypeProperty ;
+    :label "Original Creation Date" ;
+    :display true ;
+    :editable false ;
+    rdfs:domain :DigitalObject .
+
+qaat:photographer a owl:DatatypeProperty ;
+    :label "Photographer" ;
+    :display true ;
+    :editable false ;
+    rdfs:domain :Photograph .
 
 # vim: set ai si sw=4 sts=4 ts=4 expandtab:
