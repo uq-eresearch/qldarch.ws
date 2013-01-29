@@ -452,11 +452,15 @@ foaf:Person
       qaat:label "Hill Residence, Clayfield" .
 
 <http://qldarch.net/omeka/items/show/8>
-      a       qldarch:DigitalObject ;
+      a       qldarch:DigitalObject , qldarch:Interview ;
       dcterms:created "2012-07-13"^^xsd:string ;
       dcterms:creator <http://qldarch.net/ns/omeka/2012-11/pseudoentity#Creator,Janina+Gosseye> ;
       dcterms:description "interview with James Birrell"^^xsd:string ;
-      dcterms:title "James Birrell interview"^^xsd:string .
+      dcterms:title "James Birrell interview"^^xsd:string ;
+      qldarch:externalLocation
+              "http://115.146.94.110/static/Birrrell_JM&AW.ogg"^^xsd:string ;
+      qldarch:transcriptLocation
+              "http://115.146.94.110/static/transcripts/birrell/Birrell.json"^^xsd:string .
 
 <http://qldarch.net/omeka/items/show/228>
       a       qldarch:DigitalObject , qldarch:Photograph ;

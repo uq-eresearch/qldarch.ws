@@ -17,10 +17,12 @@
     <property name="test.dir" location="test"/>
     <property name="reports.dir" location="${test.dir}/reports"/>
 
+    <!--
     <taskdef name="deploy" classname="org.apache.catalina.ant.DeployTask"
         classpath="${tomcat.install.path}/lib/catalina-ant.jar"/>
     <taskdef name="undeploy" classname="org.apache.catalina.ant.UndeployTask"
         classpath="${tomcat.install.path}/lib/catalina-ant.jar"/>
+    -->
 
     <path id="classpath.compile">
         <fileset dir="${lib}">

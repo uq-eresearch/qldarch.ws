@@ -146,25 +146,29 @@ foaf:Person a owl:Class ;
     :shortName "uri" .
 
 :label a owl:DatatypeProperty ;
-    :label "The preferred label for a thing" ;
+    :label "Preferred label" ;
+    rdfs:comment "The preferred label for a thing" ;
     :display false ;
     :editable true ;
     :shortName "label" .
 
 qaat:label a owl:DatatypeProperty ;
-    :label "A label for a concept from a controlled vocab" ;
+    :label "Concept label" ;
     :display false ;
     :editable false ;
-    rdfs:comment "Temporary placeholder for property that should become a SKOS concept." .
+    rdfs:comment "A label for a concept from a controlled vocab" .
+#    rdfs:comment "Temporary placeholder for property that should become a SKOS concept." .
 
 rdfs:label a owl:DatatypeProperty ;
-    :label "A label for a thing" ;
+    :label "Label" ;
     :display true ;
     :editable true ;
+    rdfs:comment "A label for a thing" ;
     :shortName "altlabel" .
 
 rdf:type a owl:DatatypeProperty ;
-    :label "A label for a thing" ;
+    :label "Type" ;
+    rdfs:comment "The type of a thing" ;
     :display false ;
     :editable false .
 
@@ -273,6 +277,18 @@ dcterms:rights a owl:DatatypeProperty ;
     :editable false ;
     rdfs:domain :DigitalObject ;
     rdfs:range xsd:anyURI .
+
+:externalLocation a owl:DatatypeProperty ;
+    :label "External Location" ;
+    :display false ;
+    :editable false ;
+    rdfs:domain :DigitalObject .
+
+:transcriptLocation a owl:DatatypeProperty ;
+    :label "Transcript Location" ;
+    :display false ;
+    :editable false ;
+    rdfs:domain :Interview .
 
 :interviewer a owl:ObjectProperty ;
     :label "Interviewer" ;
