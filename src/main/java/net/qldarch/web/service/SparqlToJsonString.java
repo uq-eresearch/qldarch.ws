@@ -12,13 +12,18 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class SparqlToJsonString {
     public static Logger logger = LoggerFactory.getLogger(SparqlToJsonString.class);
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
     public static final String XSD_INTEGER = "http://www.w3.org/2001/XMLSchema#integer";
+    public static final String INDENT1 = "    ";
+    public static final String INDENT2 = INDENT1 + INDENT1;
+    public static final String INDENT3 = INDENT2 + INDENT1;
 
     Repository myRepository;
     RepositoryConnection conn;
@@ -34,10 +39,6 @@ public class SparqlToJsonString {
         } catch (Exception e) {
             initError = e;
         }
-    }
-
-    public String cleanString(String in) {
-        return in.replaceAll("\n", "").replaceAll("\r", "");
     }
 
     public String performQuery(String query) {
@@ -63,13 +64,13 @@ public class SparqlToJsonString {
                     if (!propertyGraph.containsKey(s.toString())) {
                         propertyGraph.put(s.toString(), new HashMap<String, Value>());
                     }
-                    Map<String, Value> property = propertyGraph.get(s.toString());
+                    Map<String, List<Value>> property = propertyGraph.get(s.toString());
 
-                    if (property.containsKey(p.toString())) {
-                        logger.info("Multiple values found for ontology property {} on {}", p, s);
-                    } else {
-                        property.put(p.toString(), o);
+                    if (!property.containsKey(p.toString())) {
+                        property.put(p.toString(), new ArrayList<Value>());
                     }
+
+                    property.get(p.toString().add(o);
                 }
 
                 pw.println("{");
@@ -82,28 +83,32 @@ public class SparqlToJsonString {
                     }
 
                     Map<String, Value> propertyMap = propertyGraph.get(str);
-                    pw.println("    \"" + str + "\": {");
-                    pw.print("        \"uri\": \"" + str + "\"");
+                    pw.println(INDENT1 + "\"" + str + "\": {");
+                    pw.print(INDENT2 + "\"uri\": \"" + str + "\"");
                     for (String prop : propertyMap.keySet()) {
                         pw.println(",");
+                        pw.print(INDENT2 + "\"" + prop + "\": ");
 
-                        Value v = propertyMap.get(prop);
-                        pw.print("        \"" + prop + "\": ");
-                        if (v instanceof Literal) {
-                            Literal l = (Literal)v;
-                            String datatype = l.getDatatype() == null ? "" : l.getDatatype().toString();
-                            if (datatype.equals(XSD_BOOLEAN)) {
-                                pw.print(l.booleanValue());
-                            } else if (datatype.equals(XSD_INTEGER)) {
-                                pw.print(l.integerValue().intValue()); // Note: This truncates, but I don't have time to fix that atm.
-                            } else {
-                                pw.print("\"" + cleanString(l.getLabel()) + "\"");
-                            }
+                        List<Value> values = propertyMap.get(prop);
+                        if (values.getLength() == 1) {
+                            printValue(pw, values.get(0));
                         } else {
-                            pw.print("\"" + cleanString(v.toString()) + "\"");
+                            pw.println("[");
+                            boolean firstl = true;
+                            for (Value v : values) {
+                                if (!firstl) {
+                                    pw.println(",");
+                                } else {
+                                    firstl = false;
+                                }
+
+                                pw.print(INDENT3);
+                                printValue(pw, v);
+                            }
+                            pw.print("\n" + INDENT2 + "]");
                         }
                     }
-                    pw.print("\n    }");
+                    pw.print("\n" + INDENT1 + "}");
                 }
                 pw.println("\n}");
             } catch (QueryEvaluationException eq) {
@@ -120,4 +125,23 @@ public class SparqlToJsonString {
         return sw.toString();
     }
 
+    private void printValue(PrintWriter pw, Value v) {
+        if (v instanceof Literal) {
+            Literal l = (Literal)v;
+            String datatype = l.getDatatype() == null ? "" : l.getDatatype().toString();
+            if (datatype.equals(XSD_BOOLEAN)) {
+                pw.print(l.booleanValue());
+            } else if (datatype.equals(XSD_INTEGER)) {
+                pw.print(l.integerValue().intValue()); // Note: This truncates, but I don't have time to fix that atm.
+            } else {
+                pw.print("\"" + cleanString(l.getLabel()) + "\"");
+            }
+        } else {
+            pw.print("\"" + cleanString(v.toString()) + "\"");
+        }
+    }
+
+    private String cleanString(String in) {
+        return in.replaceAll("\n", "").replaceAll("\r", "");
+    }
 }
