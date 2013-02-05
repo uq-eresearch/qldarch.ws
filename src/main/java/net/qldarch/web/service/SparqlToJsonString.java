@@ -53,7 +53,7 @@ public class SparqlToJsonString {
         }
 
         try {
-            Map<String, Map<String, Value>> propertyGraph = new HashMap<String, Map<String, Value>>();
+            Map<String, Map<String, List<Value>>> propertyGraph = new HashMap<String, Map<String, List<Value>>>();
             try {
                 TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
                 while (result.hasNext()) {
@@ -62,7 +62,7 @@ public class SparqlToJsonString {
                     Value p = bs.getValue("p");
                     Value o = bs.getValue("o");
                     if (!propertyGraph.containsKey(s.toString())) {
-                        propertyGraph.put(s.toString(), new HashMap<String, Value>());
+                        propertyGraph.put(s.toString(), new HashMap<String, List<Value>>());
                     }
                     Map<String, List<Value>> property = propertyGraph.get(s.toString());
 
@@ -70,7 +70,7 @@ public class SparqlToJsonString {
                         property.put(p.toString(), new ArrayList<Value>());
                     }
 
-                    property.get(p.toString().add(o);
+                    property.get(p.toString()).add(o);
                 }
 
                 pw.println("{");
@@ -82,7 +82,7 @@ public class SparqlToJsonString {
                         firsta = false;
                     }
 
-                    Map<String, Value> propertyMap = propertyGraph.get(str);
+                    Map<String, List<Value>> propertyMap = propertyGraph.get(str);
                     pw.println(INDENT1 + "\"" + str + "\": {");
                     pw.print(INDENT2 + "\"uri\": \"" + str + "\"");
                     for (String prop : propertyMap.keySet()) {
@@ -90,7 +90,7 @@ public class SparqlToJsonString {
                         pw.print(INDENT2 + "\"" + prop + "\": ");
 
                         List<Value> values = propertyMap.get(prop);
-                        if (values.getLength() == 1) {
+                        if (values.size() == 1) {
                             printValue(pw, values.get(0));
                         } else {
                             pw.println("[");
