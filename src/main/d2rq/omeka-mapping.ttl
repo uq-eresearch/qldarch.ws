@@ -444,6 +444,30 @@ map:location a d2rq:PropertyBridge;
     d2rq:condition "o_element_sets.name='Item Type Metadata'";
     d2rq:condition "o_elements.name='Location'"
     .
+map:externalLocation a d2rq:PropertyBridge;
+	d2rq:dataStorage map:database;
+    d2rq:belongsToClassMap map:digitalObjects;
+    d2rq:property qldarch:externalLocation;
+    d2rq:datatype xsd:string;
+    d2rq:column "o_element_texts.text";
+    d2rq:join "o_elements.id <= o_element_texts.element_id";
+    d2rq:join "o_items.id <= o_element_texts.record_id";
+    d2rq:join "o_element_sets.id <= o_elements.element_set_id";
+    d2rq:condition "o_element_sets.name='Item Type Metadata'";
+    d2rq:condition "o_elements.name='External Location'"
+    .
+map:transcriptLocation a d2rq:PropertyBridge;
+	d2rq:dataStorage map:database;
+    d2rq:belongsToClassMap map:digitalObjects;
+    d2rq:property qldarch:transcriptLocation;
+    d2rq:datatype xsd:string;
+    d2rq:column "o_element_texts.text";
+    d2rq:join "o_elements.id <= o_element_texts.element_id";
+    d2rq:join "o_items.id <= o_element_texts.record_id";
+    d2rq:join "o_element_sets.id <= o_elements.element_set_id";
+    d2rq:condition "o_element_sets.name='Item Type Metadata'";
+    d2rq:condition "o_elements.name='Transcript Location'"
+    .
 map:periodical a d2rq:PropertyBridge;
 	d2rq:dataStorage map:database;
     d2rq:belongsToClassMap map:digitalObjects;
