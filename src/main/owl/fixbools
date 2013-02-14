@@ -1,3 +1,0 @@
-#!/bin/bash
-
-sed -e 's/\(true\|false\)\./\1 ./g'

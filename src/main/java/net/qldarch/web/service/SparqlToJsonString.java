@@ -32,7 +32,8 @@ public class SparqlToJsonString {
     public SparqlToJsonString() {
         try {
             initError = null;
-            myRepository = new HTTPRepository("http://localhost:8080/openrdf-sesame", "QldarchMetadataServer");
+            myRepository = new HTTPRepository("http://localhost:8080/openrdf-sesame",
+                    "QldarchMetadataServer");
             myRepository.initialize();
 
             conn = myRepository.getConnection();
@@ -53,7 +54,8 @@ public class SparqlToJsonString {
         }
 
         try {
-            Map<String, Map<String, List<Value>>> propertyGraph = new HashMap<String, Map<String, List<Value>>>();
+            Map<String, Map<String, List<Value>>> propertyGraph =
+                    new HashMap<String, Map<String, List<Value>>>();
             try {
                 TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
                 while (result.hasNext()) {
@@ -72,6 +74,8 @@ public class SparqlToJsonString {
 
                     property.get(p.toString()).add(o);
                 }
+
+                logger.warn("Result: " + propertyGraph.toString());
 
                 pw.println("{");
                 boolean firsta = true;
