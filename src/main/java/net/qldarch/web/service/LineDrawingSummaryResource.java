@@ -29,7 +29,7 @@ public class LineDrawingSummaryResource {
     public String performGet() {
         return new SparqlToJsonString().performQuery(
                 "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "select ?s ?p ?o from <http://qldarch.net/ns/omeka-export/2012-12-17> where {" +
+                "select ?s ?p ?o from <http://qldarch.net/ns/omeka-export/2013-02-06> where {" +
                 "  ?s a :LineDrawing ." +
                 "  ?s ?p ?o ." +
                 " }");
