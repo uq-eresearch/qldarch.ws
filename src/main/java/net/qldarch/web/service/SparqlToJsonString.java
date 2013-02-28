@@ -146,6 +146,6 @@ public class SparqlToJsonString {
     }
 
     private String cleanString(String in) {
-        return in.replaceAll("\n", "").replaceAll("\r", "").replaceAll("\"", "\\\"");
+        return in.replaceAll("\n", "").replaceAll("\r", "").replaceAll("\"", "\\\\\"");
     }
 }
