@@ -32,7 +32,7 @@ public class OntologyPropertiesResource {
     public String performGet() {
         return new SparqlToJsonString().performQuery(
                 "select ?s ?p ?o" +
-                " from <http://qldarch.net/ns/rdf/2012/06/terms#>" +
+                " from <http://qldarch.net/ns/rdf/2012-06/terms#>" +
                 " where {" +
                 " { ?s rdf:type owl:DatatypeProperty. ?s ?p ?o. }" +
                 " union { ?s rdf:type owl:ObjectProperty. ?s ?p ?o. }" +
