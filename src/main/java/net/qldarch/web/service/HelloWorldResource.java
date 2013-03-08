@@ -17,6 +17,7 @@ public class HelloWorldResource {
     @Produces("text/plain")
     public String hello() {
         logger.warn("Returning {} from GET", message);
+        logger.debug("Returning {} from GET at DEBUG", message);
         return message;
     }
 
