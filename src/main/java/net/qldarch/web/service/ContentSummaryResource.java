@@ -29,7 +29,7 @@ public class ContentSummaryResource {
     public String performGet() {
         return new SparqlToJsonString().performQuery(
                 "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "select ?s ?p ?o from <http://qldarch.net/ns/rdf/2012/06/terms#> where {" +
+                "select ?s ?p ?o from <http://qldarch.net/ns/rdf/2012-06/terms#> where {" +
                 "  ?s a owl:Class ." +
                 "  ?s :toplevel true ." +
                 "  ?s ?p ?o ." +
