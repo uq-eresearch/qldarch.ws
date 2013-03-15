@@ -5,3 +5,4 @@ tags
 tmp/
 tomcat.properties
 test/reports
+.idea
