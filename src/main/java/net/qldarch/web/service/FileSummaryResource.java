@@ -47,21 +47,27 @@ public class FileSummaryResource {
             @QueryParam("PREFIX") String prefix,
             @QueryParam("ID") Set<String> idParam,
             @DefaultValue("") @QueryParam("IDLIST") String idlist) {
+        logger.debug("Querying PREFIX: {}, ID: {}, IDLIST: {}", prefix, idParam, idlist);
         Set<String> ids = newHashSet(idParam);
-        Iterables.addAll(ids, Splitter.on(',').split(idlist));
+        Iterables.addAll(ids, Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
+        logger.debug("Raw ids: {}", ids);
         return new SparqlToJsonString().performQuery(formatQuery(resolvePrefix(prefix, ids)));
     }
 
     private static Collection<String> resolvePrefix(String prefixString, Collection<String> ids) {
         Optional<String> prefix = fromNullable(prefixString);
 
-        return prefix.isPresent() ? transform(ids, concater(prefix.get())) : ids;
+        return prefix.isPresent() ? transform(ids, resolver(prefix.get())) : ids;
     }
 
-    private static Function<String,String> concater(final String prefix) {
+    private static Function<String,String> resolver(final String prefix) {
         return new Function<String,String>() {
             public String apply(String s) {
-                return prefix + s;
+                if (s.indexOf(':') == -1) {
+                    return prefix + s;
+                } else {
+                    return s;
+                }
             }
         };
     }
