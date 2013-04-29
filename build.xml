@@ -10,6 +10,7 @@
     <property name="src.main.java" location="${src}/main/java"/>
     <property name="src.test.java" location="${src}/test/java"/>
     <property name="src.test.resources" location="${src}/test/resources"/>
+    <property name="src.main.resources" location="${src}/main/resources"/>
     <property name="build.main.java" location="${build}/jvm/classes"/>
     <property name="build.test.java" location="${build}/test/classes"/>
     <property name="src.war.conf" location="${src}/main/webapp"/>
@@ -96,6 +97,7 @@
             <!--            <metainf file="${src.war.conf}/META-INF/context.xml"/> -->
             <classes dir="${build.main.java}"/>
             <lib dir="${lib}"/>
+            <classes dir="${src.main.resources}"/>
         </war>
         <move file="${dist}/HelloWorld-${version}-min.war" tofile="${dist}/ws.war" />
     </target>
