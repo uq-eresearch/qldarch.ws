@@ -1,9 +1,0 @@
-Pending integration: Ant2Ide - IDE project file generation from Ant build.xml.
-File: dependencies/ant2ide.jar
-url: http://gleamynode.net/articles/2234/
-license: unknown
-
-Apache Shiro Security Framework
-File: dependencies/shiro-all-1.2.2.jar
-url: http://shiro.apache.org/index.html
-license: Apache 2.0
