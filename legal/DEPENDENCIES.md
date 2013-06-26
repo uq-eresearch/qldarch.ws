@@ -95,3 +95,15 @@ URL: http://shiro.apache.org/index.html
 LICENSE: Apache 2.0
 FILES: dependencies/shiro-all-1.2.2.jar
 JARS: shiro-all-1.2.2.jar
+
+Project: Apache Commons Collections
+URL: http://commons.apache.org/proper/commons-collections/
+LICENSE: Apache 2.0
+FILES: dependencies/commons-collections-3.2.1-bin.tar.gz
+JARS: commons-collections-3.2.1.jar
+
+Project: Apache Commons BeanUtils
+URL: http://commons.apache.org/proper/commons-beanutils/
+LICENSE: Apache 2.0
+FILES: dependencies/commons-beanutils-1.8.3-bin.tar.gz
+JARS: commons-beanutils-1.8.3.jar
