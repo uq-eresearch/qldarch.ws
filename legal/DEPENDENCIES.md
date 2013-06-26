@@ -94,7 +94,7 @@ Project: Apache Shiro Security Framework
 URL: http://shiro.apache.org/index.html
 LICENSE: Apache 2.0
 FILES: dependencies/shiro-all-1.2.2.jar
-JARS: shiro-all-1.2.2.jar
+JARS: shiro-all-1.2.2.jar shiro-tools-hasher-1.2.2-cli.jar
 
 Project: Apache Commons Collections
 URL: http://commons.apache.org/proper/commons-collections/
