@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- To deploy insert the appropriate username/password and copy
+     this file into /etc/tomcat6/Catalina/localhost/ws.xml, or 
+     the appropriate context file path in your installation. -->
+<Context debug="0">
+    <Resource name="jdbc/UserDB" auth="Container" type="javax.sql.DataSource"
+        maxActive="50" maxIdle="10" maxWait="10000"
+        username="auth" password="tmppassword" driveClassName="com.mysql.jdbc.Driver"
+        url="jdbc:mysql://localhost/userdb"/>
+</Context>
