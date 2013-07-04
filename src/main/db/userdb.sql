@@ -2,8 +2,7 @@ CREATE TABLE users (
     username varchar(50) PRIMARY KEY,
     email varchar(100) NOT NULL,
     verified boolean NOT NULL DEFAULT FALSE,
-    password varchar(50) NOT NULL,
-    password_salt varchar(100) NOT NULL
+    password varchar(100) NOT NULL
 ) ENGINE=INNODB DEFAULT CHARSET=latin1;
 
 CREATE TABLE roles (
