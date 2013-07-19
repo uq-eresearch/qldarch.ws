@@ -19,6 +19,19 @@ public class LoginResource {
     
     @GET
     @Produces("application/json")
+    public String getLogin() {
+        Subject currentUser = SecurityUtils.getSubject();
+        Principal principal = currentUser.getPrincipal();
+
+        if (principal != null) {
+            return "{ user: " + principal.toString() + ", auth: true }";
+        } else {
+            return "{ user: \"\", auth: false }";
+        }
+    }
+
+    @POST
+    @Produces("application/json")
     public String login(
             @QueryParam("username") String username,
             @QueryParam("password") String password) {
