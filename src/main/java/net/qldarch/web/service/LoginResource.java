@@ -1,8 +1,9 @@
 package net.qldarch.web.service;
 
 import javax.ws.rs.GET;
-import javax.ws.rs.QueryParam;
+import javax.ws.rs.FormParam;
 import javax.ws.rs.Path;
+import javax.ws.rs.POST;
 import javax.ws.rs.Produces;
 
 import org.apache.shiro.SecurityUtils;
@@ -21,10 +22,10 @@ public class LoginResource {
     @Produces("application/json")
     public String getLogin() {
         Subject currentUser = SecurityUtils.getSubject();
-        Principal principal = currentUser.getPrincipal();
+        Object principal = currentUser.getPrincipal();
 
         if (principal != null) {
-            return "{ user: " + principal.toString() + ", auth: true }";
+            return "{ user: \"" + principal.toString() + "\", auth: true }";
         } else {
             return "{ user: \"\", auth: false }";
         }
@@ -33,8 +34,8 @@ public class LoginResource {
     @POST
     @Produces("application/json")
     public String login(
-            @QueryParam("username") String username,
-            @QueryParam("password") String password) {
+            @FormParam("username") String username,
+            @FormParam("password") String password) {
         logger.debug("Login attempt received for username={}", username);
         logger.trace("Login attempt received for password={}", password);
         try {
@@ -46,7 +47,7 @@ public class LoginResource {
                 currentUser.login(token);
                 logger.trace("Successful authentication for {}", username);
 
-                return "{ user: " + username + ", auth: true }";
+                return "{ user: \"" + username + "\", auth: true }";
             }
         } catch (AuthenticationException ea) {
             logger.debug("Failed authentication for {}", username);
