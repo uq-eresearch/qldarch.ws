@@ -5,7 +5,10 @@ import javax.ws.rs.FormParam;
 import javax.ws.rs.Path;
 import javax.ws.rs.POST;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Response;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.UsernamePasswordToken;
@@ -20,24 +23,31 @@ public class LoginResource {
     
     @GET
     @Produces("application/json")
+    @Path("/status")
     public String getLogin() {
         Subject currentUser = SecurityUtils.getSubject();
         Object principal = currentUser.getPrincipal();
+        logger.trace("Checking current login status: " + principal);
 
+        ObjectNode on = JsonNodeFactory.instance.objectNode();
         if (principal != null) {
-            return "{ user: \"" + principal.toString() + "\", auth: true }";
+            on.put("user", principal.toString());
+            on.put("auth", true);
         } else {
-            return "{ user: \"\", auth: false }";
+            on.put("user", "");
+            on.put("auth", false);
         }
+        return on.toString();
     }
 
     @POST
     @Produces("application/json")
-    public String login(
+    public Response login(
             @FormParam("username") String username,
             @FormParam("password") String password) {
-        logger.debug("Login attempt received for username={}", username);
-        logger.trace("Login attempt received for password={}", password);
+        logger.info("Login attempt received for username={}", username);
+        ObjectNode on = JsonNodeFactory.instance.objectNode();
+
         try {
             if (username != null && password != null) {
                 UsernamePasswordToken token =
@@ -47,13 +57,21 @@ public class LoginResource {
                 currentUser.login(token);
                 logger.trace("Successful authentication for {}", username);
 
-                return "{ user: \"" + username + "\", auth: true }";
+                on.put("user", username);
+                on.put("auth", true);
+
+                return Response.ok()
+                    .entity(on.toString())
+                    .build();
             }
         } catch (AuthenticationException ea) {
             logger.debug("Failed authentication for {}", username);
-            logger.trace("Failed authentication <{},{}>", username, password);
         }
 
-        return "{ user: \"\", auth: false }";
+        on.put("user", "");
+        on.put("auth", false);
+        return Response.status(Response.Status.FORBIDDEN)
+            .entity(on.toString())
+            .build();
     }
 }

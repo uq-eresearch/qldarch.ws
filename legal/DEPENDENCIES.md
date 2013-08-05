@@ -107,3 +107,10 @@ URL: http://commons.apache.org/proper/commons-beanutils/
 LICENSE: Apache 2.0
 FILES: dependencies/commons-beanutils-1.8.3-bin.tar.gz
 JARS: commons-beanutils-1.8.3.jar
+
+Project: Jackson JSON Core
+URL: http://wiki.fasterxml.com/JacksonHome
+License: Apache 2.0
+FILES: jackson-core-2.2.0.jar jackson-databind-2.2.0.jar
+JARS: jackson-core-2.2.0.jar jackson-databind-2.2.0.jar
+

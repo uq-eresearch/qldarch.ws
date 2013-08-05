@@ -7,7 +7,7 @@
     </encoder>
   </appender>
 
-  <logger name="net.qldarch.web" level="DEBUG"/>
+  <logger name="net.qldarch.web" level="TRACE"/>
 
   <root level="WARN">
     <appender-ref ref="stdout" />
