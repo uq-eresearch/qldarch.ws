@@ -1,0 +1,269 @@
+package net.qldarch.web.service;
+
+import org.openrdf.model.Literal;
+import org.openrdf.model.Value;
+import org.openrdf.query.*;
+import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.http.HTTPRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.google.common.collect.ImmutableBiMap;
+
+public class KnownPrefixes {
+    public static Logger logger = LoggerFactory.getLogger(KnownPrefixes.class);
+
+    public static final String DEFAULT_SERVER_URI = "http://localhost:8080/openrdf-sesame";
+    public static final String DEFAULT_REPO_NAME = "QldarchMetadataServer";
+    public static final String DEFAULT_GRAPH = "http://qldarch.net/ns/rdf/2013-08/internal#";
+    public static final String XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";
+
+    public static final String PREFIX_MAP_QUERY_FORMAT = 
+        "@PREFIX qaint: <http://qldarch.net/ns/rdf/2013-08/internal#> " +
+        "select distinct ?prefix ?uri " + 
+        "from <%s> " +
+        "where { " +
+        "  ?uri qaint:usesPrefix ?prefix . " +
+        "}";
+
+    public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
+    public static final String XSD_INTEGER = "http://www.w3.org/2001/XMLSchema#integer";
+
+    /*
+     * Factory field/method.
+     */
+    static private KnownPrefixes singleton;
+
+    static KnownPrefixes instance() {
+        synchronized(KnownPrefixes.class) {
+            if (singleton != null) {
+                return singleton;
+            } else {
+                singleton = new KnownPrefixes();
+                return singleton;
+            }
+        }
+    }
+
+    /*
+     * Fields
+     */
+    private String serverURI = DEFAULT_SERVER_URI;
+    private String repoName = DEFAULT_REPO_NAME;
+    private String graph = DEFAULT_GRAPH;
+    private BiMap<String, URI> prefixes = null;
+
+    public KnownPrefixes() {}
+
+    public String getPrefix(URI uri) throws MetadataRepositoryException {
+        if (uri == null) throw new IllegalArgumentException("Prefix URI cannot be null");
+        return this.getMap().inverse().get(uri);
+    }
+    
+    public URI getURI(String prefix) throws MetadataRepositoryException {
+        if (prefix == null) throw new IllegalArgumentException("Prefix string cannot be null");
+        return this.getMap().get(prefix);
+    }
+
+    private synchronized BiMap<String, URI> getMap() throws MetadataRepositoryException {
+        if (this.prefixes != null && this.prefixes.size() > 0) {
+            return this.prefixes;
+        }
+
+        Throwable error = null;
+
+        Repository repo = null;
+        RepositoryConnection conn = null;
+        try {
+            repo = new HTTPRepository(this.getServerURI(), this.getRepoName());
+            repo.initialize();
+
+            conn = repo.getConnection();
+
+            this.prefixes = loadMap(conn);
+        } catch (Exception ei) {
+            logger.error("Unable to initialize known-prefixes from store", ei);
+            this.prefixes = loadDefaults();
+        } finally {
+            try {
+                if (conn != null && conn.isOpen()) {
+                    conn.close();
+                }
+            } catch (RepositoryException erc) {
+                logger.warn("Error closing repository connection", erc);
+                error = erc;
+            } finally {
+                try {
+                    if (repo != null && repo.isInitialized()) {
+                        repo.shutDown();
+                    }
+                } catch (RepositoryException er) {
+                    logger.warn("Error shutting down repository reference", er);
+                    if (error != null) error = er;
+                }
+            }
+        }
+
+        if (this.prefixes != null && this.prefixes.size() > 0) {
+            return this.prefixes;
+        } else {
+            throw new MetadataRepositoryException("Unable to load known prefixes", error);
+        }
+    }
+
+    private BiMap<String, URI> loadMap(RepositoryConnection conn)
+            throws RepositoryException, MetadataRepositoryException {
+        String query = String.format(PREFIX_MAP_QUERY_FORMAT, this.getGraph());
+        logger.trace("Loading prefix map with query: {}", query);
+
+        try {
+            TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
+
+            BiMap<String, URI> map = HashBiMap.create();
+
+            while (result.hasNext()) {
+                BindingSet bs = result.next();
+                Value rawPrefix = bs.getValue("prefix");
+                Value rawURI = bs.getValue("uri");
+
+                String prefix = validatePrefix(rawPrefix, rawURI);
+                URI uri = validateURI(rawPrefix, rawURI);
+
+                if (prefix == null || uri == null) {
+                    logger.debug("Error in prefix query result. Skipping entry ({}, {})",
+                            rawPrefix, rawURI);
+                    continue;
+                }
+
+                if (map.containsKey(prefix)) {
+                    logger.debug("Duplicate prefix string in result {}, first uri: {}, second uri: {}",
+                            prefix, map.get(prefix), uri);
+                    continue;
+                } 
+                if (map.containsValue(uri)) {
+                    logger.debug("Duplicate uri in result {}, first prefix: {}, second prefix: {}",
+                            uri, map.inverse().get(uri), prefix);
+                    continue;
+                }
+
+                map.put(prefix, uri);
+            }
+
+            return ImmutableBiMap.copyOf(map);
+        } catch (MalformedQueryException em) {
+            throw new MetadataRepositoryException("Failed to load prefix map from store", em);
+        } catch (QueryEvaluationException eq) {
+            throw new MetadataRepositoryException("Failed to load prefix map from store", eq);
+        }
+    }
+
+    private String validatePrefix(Value rawPrefix, Value rawURI) {
+        if (rawPrefix == null) {
+            logger.warn("null prefix from prefix query for uri: {}", rawURI.toString());
+            return null;
+        } else if (!(rawPrefix instanceof Literal)) {
+            logger.warn("prefix({}) is not a literal for uri: {}", rawPrefix, rawURI);
+            return null;
+        }
+
+        Literal literalPrefix = (Literal)rawPrefix;
+        Object datatype = literalPrefix.getDatatype();
+
+        if (datatype != null && !datatype.equals(XSD_STRING)) {
+            logger.warn("prefix {} has non-string datatype {} for uri {}",
+                    literalPrefix, datatype, rawURI);
+            return null;
+        }
+
+        return literalPrefix.stringValue();
+    }
+
+    private URI validateURI(Value rawURI, Value rawPrefix) {
+        if (rawURI == null) {
+            logger.warn("null uri from prefix query for prefix: {}", rawPrefix.toString());
+            return null;
+        } else if (!(rawURI instanceof org.openrdf.model.URI)) {
+            logger.warn("uri({}) is not a uri for prefix: {}", rawURI, rawPrefix);
+            return null;
+        }
+
+        try {
+            return new URI(rawURI.toString());
+        } catch (URISyntaxException eu) {
+            logger.warn("Invalid uri syntax({}) for prefix {}", rawURI, rawPrefix, eu);
+            return null;
+        }
+    }
+
+    private BiMap<String, URI> loadDefaults() {
+        logger.warn("Fall through to default prefix map used");
+        ImmutableBiMap.Builder<String,URI> builder = ImmutableBiMap.builder();
+        return builder
+            .put("qldarch", URI.create("http://qldarch.net/ns/rdf/2012-06/terms#"))
+            .put("qavocab", URI.create("http://qldarch.net/ns/skos/2013-02/vocab#"))
+            .put("qaint", URI.create("http://qldarch.net/ns/rdf/2013-08/internal#"))
+            .put("rdf", URI.create("http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
+            .put("rdfs", URI.create("http://www.w3.org/2000/01/rdf-schema#"))
+            .put("owl", URI.create("http://www.w3.org/2002/07/owl#"))
+            .put("xsd", URI.create("http://www.w3.org/2001/XMLSchema#"))
+            .put("dcterms", URI.create("http://purl.org/dc/terms/"))
+            .put("foaf", URI.create("http://xmlns.com/foaf/0.1/"))
+            .put("skos", URI.create("http://www.w3.org/2004/02/skos/core#"))
+            .put("geo", URI.create("http://www.w3.org/2003/01/geo/wgs84_pos#"))
+            .put("http", URI.create("http:"))
+            .build();
+    }
+
+    /**
+     * Set the URI used to contact the metadata server.
+     *
+     * Note: This will force a reload of the prefix map on the next 
+     *   lookup of a prefix or uri.
+     */
+    public void setServerURI(String serverURI) {
+        this.prefixes = null;
+        this.serverURI = serverURI;
+    }
+
+    public String getServerURI() {
+        return this.serverURI;
+    }
+
+    /**
+     * Set the name of the repository queried containing the prefix configuration.
+     *
+     * Note: This will force a reload of the prefix map on the next 
+     *   lookup of a prefix or uri.
+     */
+    public void setRepoName(String repoName) {
+        this.prefixes = null;
+        this.repoName = repoName;
+    }
+
+    public String getRepoName() {
+        return this.repoName;
+    }
+
+    /**
+     * Set the graph containing the prefix configuration.
+     *
+     * Note: This will force a reload of the prefix map on the next 
+     *   lookup of a prefix or uri.
+     */
+    public void setGraph(String graph) {
+        this.prefixes = null;
+        this.graph = graph;
+    }
+
+    public String getGraph() {
+        return this.graph;
+    }
+
+}
