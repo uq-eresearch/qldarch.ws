@@ -36,19 +36,57 @@ public class KnownPrefixes {
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
     public static final String XSD_INTEGER = "http://www.w3.org/2001/XMLSchema#integer";
 
+    private static final Pattern PREFIXED_URI =
+        Pattern.compile("\\A([a-zA-Z][a-zA-Z0-9+-.]*):(.*)\\z");
+
+    public static URI resolve(String uriString) throws MetadataRepositoryException {
+        if (uriString == null) throw new IllegalArgumentException("URI cannot be null");
+        Matcher matcher = PREFIXED_URI.match(uriString);
+
+        if (!matcher.matches()) {
+            logger.debug("{} fails URI prefix validation", uriString);
+            throw new MetadataRepositoryException("URIString fails URI prefix validation");
+        }
+
+        if (matcher.groupCount() != 2) {
+            logger.debug("Incorrect number of groups({}) match {}",
+                    matcher.groupCount(), uriString);
+            throw new MetadataRepositoryException("Incorrect number of groups match");
+        }
+
+        logger.debug("Fetching prefix URI matching {}", matcher.group(1));
+
+        URI prefix = KnownPrefixes.instance().getURI(matcher.group(1));
+        if (prefix == null) {
+            try {
+                return new URI(uriString);
+            } catch (URISyntaxException eu1) {
+                logger.debug("Attempt to resolve invalid URI {}", uriString, eu1);
+                throw new MetadataRepositoryException("Attempt to resolve invalid URI", eu1);
+            }
+        } else {
+            try {
+                URI suffix = new URI(matcher.group(2));
+                return prefix.resolve(suffix);
+            } catch (URISyntaxException eu2) {
+                logger.debug("Suffix was not a valid relative URI {}", matcher.group(2), eu2);
+                throw new MetadataRepositoryException("Invalid URI in resolution against prefix");
+            }
+        }
+    }
+
+
     /*
      * Factory field/method.
      */
-    static private KnownPrefixes singleton;
+    private static KnownPrefixes singleton;
 
-    static KnownPrefixes instance() {
-        synchronized(KnownPrefixes.class) {
-            if (singleton != null) {
-                return singleton;
-            } else {
-                singleton = new KnownPrefixes();
-                return singleton;
-            }
+    public static synchronized KnownPrefixes instance() {
+        if (singleton != null) {
+            return singleton;
+        } else {
+            singleton = new KnownPrefixes();
+            return singleton;
         }
     }
 

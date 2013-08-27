@@ -18,6 +18,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
 
 import static com.google.common.base.Functions.toStringFunction;
 import static com.google.common.base.Optional.fromNullable;
@@ -28,6 +29,8 @@ import static com.google.common.collect.Sets.newHashSet;
 public class EntitySummaryResource {
     public static Logger logger = LoggerFactory.getLogger(EntitySummaryResource.class);
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
+
+    public static String USER_ENTITY_GRAPH_FORMAT "http://qldarch.net/users/%s/entities";
 
     public static String summaryQuery(Collection<String> types) {
         StringBuilder builder = new StringBuilder(
@@ -106,22 +109,69 @@ public class EntitySummaryResource {
         return new SparqlToJsonString().performQuery(descriptionQuery(ids));
     }
 
-    /*
     @POST
-    @Produces("application/json")
-    @Path("description/{type}")
-    public String addEntity(
-            @PathParam("type") String type,
-            @PathParam("id") String id,
-            @DefaultValue("") @QueryParam("IDLIST") String typelist) {
-        logger.debug("Querying type: {}, typelist: {}", type, typelist);
+    @Path("description/")
+    @Produces("text/plain")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RequiresPermissions("create:entity")
+    public Response addEntity(RdfDescription rdf) {
+        // Check User Authz
+        Subject currentUser = SecurityUtils.getSubject();
+        String username = Validators.username((String)currentUser.getPrincipal());
 
-        Set<String> types = newHashSet(type);
-        Iterables.addAll(types, Splitter.on(',').trimResults().omitEmptyStrings().split(typelist));
+        URI userEntityGraph = URI.create(String.format(USER_ENTITY_GRAPH_FORMAT, username));
 
-        logger.debug("Raw types: {}", types);
+        // Check Entity type
+        Collection<URI> types = rdf.getType();
+        if (types.size() != 1) {
+            error();
+        }
 
-        return new SparqlToJsonString().performQuery(formatQuery(types));
+        URI type = type.get(0);
+
+        Multimap<URI, Object> entity = QldarchOntology.findByRdfType(type);
+
+        // Generate id
+        URI id = newEntityId(userEntityGraph, type);
+
+        // Generate and Perform insert query
+        performInsert(id, rdf);
+
+        // Return id
+
+        return Response.created())
+            .entity("Hello this would be json")
+            .build();
     }
-    */
+
+    public static URI QLDARCH_TERMS = URI.create("http://qldarch.net/ns/rdf/2012-06/terms#");
+    public static URI FOAF_NS = URI.create("http://xmlns.com/foaf/0.1/");
+
+    private URI newEntityId(String userEntityGraph, URI type) {
+        URI typeFrag = QLDARCH_TERMS.relativize(type);
+        if (typeFrag.equals(type)) {
+            typeFrag = FOAF_NS.relativeize(type);
+            if (typeFrag.equals(type)) {
+                return null;
+            }
+        }
+
+        URI entityBase = userEntityGraph.resolve(typeFrag);
+
+        String id = getNextIdForUser(userEntityGraph);
+
+        return entityBase.resolve(id);
+    }
+
+    private static long START_DATE = new GregorianCalendar(2012, 1, 1, 0, 0, 0).getTime().getTime();
+    private static Random random = new Random();
+
+    private synchronized String getNextIdForUser(userEntityGraph) {
+        long delta = System.currentTimeMillis() - START_DATE;
+        Thread.sleep(1);
+        return Long.toString(delta);
+    }
+
+    private void performInsert(URI id, RdfDescription rdf) {
+    }
 }
