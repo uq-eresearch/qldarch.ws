@@ -32,6 +32,8 @@ public class EntitySummaryResource {
 
     public static String USER_ENTITY_GRAPH_FORMAT "http://qldarch.net/users/%s/entities";
 
+    private SesameConnectionPool connectionPool = null;
+
     public static String summaryQuery(Collection<String> types) {
         StringBuilder builder = new StringBuilder(
                 "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
@@ -135,7 +137,7 @@ public class EntitySummaryResource {
         URI id = newEntityId(userEntityGraph, type);
 
         // Generate and Perform insert query
-        performInsert(id, rdf);
+        performInsert(id, rdf, userEntityGraph);
 
         // Return id
 
@@ -172,6 +174,23 @@ public class EntitySummaryResource {
         return Long.toString(delta);
     }
 
-    private void performInsert(URI id, RdfDescription rdf) {
+    private void performInsert(URI id, RdfDescription rdf, URI userEntityGraph) throws MetadataRepositoryException {
+        this.getConnectionPool.perform(new RepositoryOperation() {
+            public void perform(RepositoryConnection conn)
+                    throws RepositoryException, MetadataRepositoryException {
+                URIImpl context = new URIImpl(userEntityGraph.toString());
+                conn.add(rdf.asStatements(id), new URIImpl(userEntityGraph.toString()));
+            );
+    }
+
+    public void setConnection(SesameConnectionPool connectionPool) {
+        this.connectionPool = connectionPool;
+    }
+
+    public synchronized SesameConnectionPool getConnection() {
+        if (this.connectionPool == null) {
+            this.connectionPool = SesameConnectionPool.instance();
+        }
+        return this.connectionPool;
     }
 }

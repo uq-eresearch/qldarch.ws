@@ -20,13 +20,19 @@ import com.google.common.collect.ImmutableBiMap;
 public class QldarchOntology {
     public static Logger logger = LoggerFactory.getLogger(QldarchOntology.class);
 
-    public static final String DEFAULT_SERVER_URI = "http://localhost:8080/openrdf-sesame";
-    public static final String DEFAULT_REPO_NAME = "QldarchMetadataServer";
     public static final String DEFAULT_GRAPH = "http://qldarch.net/ns/rdf/2012-06/terms#" ;
 
-    public static final String XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";
+    public static final URI RDF_TYPE =
+        URI.create("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+    private static final URI RDFS_RANGE = URI.create("http://www.w3.org/2000/01/rdf-schema#range");
+    public static final OWL_OBJECT_PROPERTY =
+        URI.create("http://www.w3.org/2002/07/owl#ObjectProperty");
+    public static final URI XSD_STRING = URI.create("http://www.w3.org/2001/XMLSchema#string");
+    private static final URI XSD_DATE = URI.create("http://www.w3.org/2001/XMLSchema#date");
+    private static final URI XSD_INTEGER = URI.create("http://www.w3.org/2001/XMLSchema#integer");
+    public static final URI XSD_BOOLEAN = URI.create("http://www.w3.org/2001/XMLSchema#boolean");
 
-    public static final String DESCRIBE_ENTITIES_QUERY = 
+    public static final String DEFAULT_ENTITY_QUERY = 
         "@PREFIX qldarch: <http://qldarch.net/ns/rdf/2012-06/terms#> " +
         "@PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " +
         "select distinct ?entity ?prop ?value " +
@@ -36,8 +42,15 @@ public class QldarchOntology {
         "  ?entity ?prop ?value . " +
         "}";
 
-    public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
-    public static final String XSD_INTEGER = "http://www.w3.org/2001/XMLSchema#integer";
+    public static final String DEFAULT_PROPERTIES_QUERY = 
+        "@PREFIX qldarch: <http://qldarch.net/ns/rdf/2012-06/terms#> " +
+        "@PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> " +
+        "select distinct ?predicate ?prop ?value " +
+        "from <%s> " +
+        "where { " +
+        "  ?predicate rdf:type rdf:Property . " +
+        "  ?predicate ?prop ?value . " +
+        "}";
 
     /*
      * Factory field/method.
@@ -56,9 +69,6 @@ public class QldarchOntology {
     /*
      * Fields
      */
-    private String serverURI = DEFAULT_SERVER_URI;
-    private String repoName = DEFAULT_REPO_NAME;
-
     private String entityQuery = DEFAULT_ENTITY_QUERY;
     private String entityGraph = DEFAULT_ENTITY_GRAPH;
 
@@ -68,13 +78,13 @@ public class QldarchOntology {
     private Map<URI, Multimap<URI, Object>> entities = null;
     private Map<URI, Multimap<URI, Object>> properties = null;
 
+    private SesameConnectionPool connectionPool = null;
+
     public QldarchOntology() {}
 
-    private interface MapLoader {
+    private interface MapLoader extends RepositoryOperation {
         public boolean isLoaded();
         public Map<URI, Multimap<URI, Object>> getLoadedMap();
-        public void loadMap(RepositoryConnection conn)
-                throws RepositoryException, MetadataRepositoryException;
     }
 
     private synchronized Map<URI, Multimap<URI,Object>> getEntities() {
@@ -87,7 +97,7 @@ public class QldarchOntology {
                 QldarchOntology.this.entities;
             }
 
-            public void loadMap(RepositoryConnection conn)
+            public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {
                 QldarchOntology.this.entities = loadStatements(conn,
                     QldarchOntology.this.getEntityQuery(),
@@ -106,7 +116,7 @@ public class QldarchOntology {
                 QldarchOntology.this.properties;
             }
 
-            public void loadMap(RepositoryConnection conn)
+            public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {
                 QldarchOntology.this.properties = loadStatements(conn,
                     QldarchOntology.this.getPropretyQuery(),
@@ -121,38 +131,7 @@ public class QldarchOntology {
             return loader.getLoadedMap();
         }
 
-        Throwable error = null;
-
-        Repository repo = null;
-        RepositoryConnection conn = null;
-        try {
-            repo = new HTTPRepository(this.getServerURI(), this.getRepoName());
-            repo.initialize();
-
-            conn = repo.getConnection();
-
-            loader.loadMap(conn);
-        } catch (Exception ei) {
-            logger.error("Unable to initialize entities from store", ei);
-        } finally {
-            try {
-                if (conn != null && conn.isOpen()) {
-                    conn.close();
-                }
-            } catch (RepositoryException erc) {
-                logger.warn("Error closing repository connection", erc);
-                error = erc;
-            } finally {
-                try {
-                    if (repo != null && repo.isInitialized()) {
-                        repo.shutDown();
-                    }
-                } catch (RepositoryException er) {
-                    logger.warn("Error shutting down repository reference", er);
-                    if (error != null) error = er;
-                }
-            }
-        }
+        getConnectionPool().performOperation(loader);
 
         if (loader.isLoaded()) {
             return loader.getLoadedMap();
@@ -161,7 +140,7 @@ public class QldarchOntology {
         }
     }
 
-    Map<URI,MultiMap<URI,Object>>>
+    private Map<URI,MultiMap<URI,Object>>>
             loadStatements(RepositoryConnection conn, String baseQuery, String graph)
             throws RepositoryException, MetadataRepositoryException {
         String query = String.format(baseQuery, graph);
@@ -254,7 +233,7 @@ public class QldarchOntology {
             Literal literal = (Literal)rawObject;
             URI datatype = literal.getDatatype();
             if (XMLDatatypeUtil.isCalendarDatatype(datatype)) {
-                return literal.calendarValue().toGregorianCalendar().getTime();
+                return literal.calendarValue();
             } else if (XMLDatatypeUtil.isIntegerDatatype(datatype)) {
                 return literal.intValue();
             } else if (XMLDatatypeUtil.isValidBoolean(literal.toString())) {
@@ -266,38 +245,6 @@ public class QldarchOntology {
             logger.warn("Unknown value type in ontology: {}", rawObject);
             return null;
         }
-    }
-
-    /**
-     * Set the URI used to contact the metadata server.
-     *
-     * Note: This will force a reload of the prefix map on the next 
-     *   lookup of a prefix or uri.
-     */
-    public synchronized void setServerURI(String serverURI) {
-        this.entities = null;
-        this.properties = null;
-        this.serverURI = serverURI;
-    }
-
-    public String getServerURI() {
-        return this.serverURI;
-    }
-
-    /**
-     * Set the name of the repository queried containing the prefix configuration.
-     *
-     * Note: This will force a reload of the prefix map on the next 
-     *   lookup of a prefix or uri.
-     */
-    public synchronized void setRepoName(String repoName) {
-        this.entities = null;
-        this.properties = null;
-        this.repoName = repoName;
-    }
-
-    public String getRepoName() {
-        return this.repoName;
     }
 
     /**
@@ -330,4 +277,73 @@ public class QldarchOntology {
         return this.propertiesGraph;
     }
 
+    public void setConnection(SesameConnectionPool connectionPool) {
+        this.connectionPool = connectionPool;
+    }
+
+    public synchronized SesameConnectionPool getConnection() {
+        if (this.connectionPool == null) {
+            this.connectionPool = SesameConnectionPool.instance();
+        }
+        return this.connectionPool;
+    }
+
+    public Value convertObject(URI property, Object object) throws MetadataRespositoryException {
+        if (!properties.containsKey(property)) {
+            return new LiteralImpl(object.toString());
+        } else {
+            Multimap<URI, Object> propertyDesc = properties.get(property);
+
+            if (propertyDesc.get(RDF_TYPE).contains(OWL_OBJECT_PROPERTY)) {
+                try {
+                    return new URIImpl(new URI(object.toString()));
+                } catch (URISyntaxException eu) {
+                    logger.debug("ObjectProperty value({}) could not be converted to URI",
+                            object, eu);
+                    return new LiteralImpl(object.toString());
+                }
+            } else {
+                Collection<Object> ranges = properties.get(property).get(RDFS_RANGE);
+                for (Object rng: ranges) {
+                    if (XSD_STRING.equals(rng)) {
+                        return new LiteralImpl(object.toString());
+                    } else if (XSD_DATE.equals(rng)) {
+                        try {
+                            return new CalendarLiteralImpl(object.toString());
+                        } catch (IllegalArgumentException ei) {
+                            logger.debug("Range of date, but object did not convert {}", object, ei);
+                            continue;
+                        }
+                    } else if (XSD_BOOLEAN.equals(rng)) {
+                        if (object instanceof Boolean) {
+                            return new BooleanLiteralImpl(object.booleanValue());
+                        } else if (object instanceof String) {
+                            String s = ((String)object).toLowerCase();
+                            if (s.equals("true") || s.equals("false")) {
+                                return new BooleanLiteralImpl(Boolean.parseBoolean(s));
+                            }
+                        }
+                        logger.debug("Range of boolean, but object did not convert {}", object);
+                        continue;
+                    } else if (XSD_INTEGER.equals(rng)) {
+                        if (object instanceof Number) {
+                            return new IntegerLiteralImpl(
+                                    BigInteger.valueOf(((Number)object).longValue()));
+                        } else {
+                            try {
+                                return new IntegerLiteralImpl(new BigInteger(object.toString()));
+                            } catch (NumberFormatException en) {
+                                logger.debug("Range of int, but object did not convert {}", object, en);
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                logger.info("Input({}) did not match any range declaration in {}", object, ranges);
+
+                return new LiteralImpl(object.toString());
+            }
+        }
+    }
 }
