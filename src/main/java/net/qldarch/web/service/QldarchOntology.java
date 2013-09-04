@@ -1,8 +1,25 @@
 package net.qldarch.web.service;
 
+import com.google.common.base.Predicates;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
-import org.openrdf.query.*;
+import org.openrdf.model.datatypes.XMLDatatypeUtil;
+import org.openrdf.model.impl.BooleanLiteralImpl;
+import org.openrdf.model.impl.CalendarLiteralImpl;
+import org.openrdf.model.impl.IntegerLiteralImpl;
+import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
@@ -10,22 +27,24 @@ import org.openrdf.repository.http.HTTPRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
-
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-import com.google.common.collect.ImmutableBiMap;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import javax.xml.datatype.XMLGregorianCalendar;
 
 public class QldarchOntology {
     public static Logger logger = LoggerFactory.getLogger(QldarchOntology.class);
 
-    public static final String DEFAULT_GRAPH = "http://qldarch.net/ns/rdf/2012-06/terms#" ;
+    public static final String DEFAULT_ENTITY_GRAPH = "http://qldarch.net/ns/rdf/2012-06/terms#" ;
+    public static final String DEFAULT_PROPERTIES_GRAPH = DEFAULT_ENTITY_GRAPH;
 
     public static final URI RDF_TYPE =
         URI.create("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
     private static final URI RDFS_RANGE = URI.create("http://www.w3.org/2000/01/rdf-schema#range");
-    public static final OWL_OBJECT_PROPERTY =
+    public static final URI OWL_OBJECT_PROPERTY =
         URI.create("http://www.w3.org/2002/07/owl#ObjectProperty");
     public static final URI XSD_STRING = URI.create("http://www.w3.org/2001/XMLSchema#string");
     private static final URI XSD_DATE = URI.create("http://www.w3.org/2001/XMLSchema#date");
@@ -76,25 +95,40 @@ public class QldarchOntology {
     private String propertiesGraph = DEFAULT_PROPERTIES_GRAPH;
 
     private Map<URI, Multimap<URI, Object>> entities = null;
+    private Multimap<URI, URI> entitiesByType = null;
     private Map<URI, Multimap<URI, Object>> properties = null;
 
     private SesameConnectionPool connectionPool = null;
 
     public QldarchOntology() {}
 
+    public Multimap<URI,Object> findByURI(URI entity) throws MetadataRepositoryException {
+        return this.getEntities().get(entity);
+    }
+
+    public List<URI> findByRdfType(URI type) throws MetadataRepositoryException {
+        List<URI> result = Lists.newArrayList();
+        for (URI entity : this.getEntitiesByType().get(type)) {
+            result.add(entity);
+        }
+        return result;
+    }
+
     private interface MapLoader extends RepositoryOperation {
         public boolean isLoaded();
         public Map<URI, Multimap<URI, Object>> getLoadedMap();
     }
 
-    private synchronized Map<URI, Multimap<URI,Object>> getEntities() {
+    private synchronized Map<URI, Multimap<URI,Object>> getEntities()
+            throws MetadataRepositoryException {
         return getMap(new MapLoader() {
             public boolean isLoaded() {
-                return (this.entities != null && this.entities.size() > 0);
+                return (QldarchOntology.this.entities != null &&
+                    QldarchOntology.this.entities.size() > 0);
             }
 
             public Map<URI, Multimap<URI, Object>> getLoadedMap() {
-                QldarchOntology.this.entities;
+                return QldarchOntology.this.entities;
             }
 
             public void perform(RepositoryConnection conn)
@@ -103,26 +137,36 @@ public class QldarchOntology {
                     QldarchOntology.this.getEntityQuery(),
                     QldarchOntology.this.getEntityGraph());
             }
-        }
+        });
     }
 
-    private synchronized Map<URI, Multimap<URI,Object>> getProperties() {
+    private synchronized Map<URI, Multimap<URI,Object>> getProperties()
+            throws MetadataRepositoryException {
         return getMap(new MapLoader() {
             public boolean isLoaded() {
-                return (this.properties != null && this.properties.size() > 0);
+                return (QldarchOntology.this.properties != null &&
+                    QldarchOntology.this.properties.size() > 0);
             }
 
             public Map<URI, Multimap<URI, Object>> getLoadedMap() {
-                QldarchOntology.this.properties;
+                return QldarchOntology.this.properties;
             }
 
             public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {
                 QldarchOntology.this.properties = loadStatements(conn,
-                    QldarchOntology.this.getPropretyQuery(),
-                    QldarchOntology.this.getPropretyGraph());
+                    QldarchOntology.this.getPropertiesGraph(),
+                    QldarchOntology.this.getPropertiesQuery());
             }
+        });
+    }
+
+    private synchronized Multimap<URI, URI> getEntitiesByType()
+            throws MetadataRepositoryException {
+        if (this.entitiesByType == null) {
+            this.entitiesByType = indexByType(this.getEntities());
         }
+        return this.entitiesByType;
     }
 
     private synchronized Map<URI, Multimap<URI,Object>> getMap(MapLoader loader) 
@@ -140,7 +184,7 @@ public class QldarchOntology {
         }
     }
 
-    private Map<URI,MultiMap<URI,Object>>>
+    private Map<URI,Multimap<URI,Object>>
             loadStatements(RepositoryConnection conn, String baseQuery, String graph)
             throws RepositoryException, MetadataRepositoryException {
         String query = String.format(baseQuery, graph);
@@ -157,7 +201,7 @@ public class QldarchOntology {
                 Value rawObject = bs.getValue("o");
 
                 URI subject = validateSubject(rawSubject);
-                URI predicate = validatePred(rawPred);
+                URI predicate = validatePredicate(rawPred);
                 Object object = validateObject(rawObject);
 
                 if (subject == null || predicate == null || object == null) {
@@ -167,7 +211,9 @@ public class QldarchOntology {
                 }
 
                 if (!map.containsKey(subject)) {
-                    map.put(subject, HashMultimap.create());
+                    // Extra line required to compensate for java's poor type inferencing.
+                    Multimap<URI, Object> mm = HashMultimap.create();
+                    map.put(subject, mm);
                 } 
 
                 map.get(subject).put(predicate, object);
@@ -185,7 +231,7 @@ public class QldarchOntology {
         if (rawSubject == null) {
             logger.warn("null subject from ontology query: {}", rawSubject);
             return null;
-        } else if (!(rawEntity instanceof org.openrdf.model.URI)) {
+        } else if (!(rawSubject instanceof org.openrdf.model.URI)) {
             logger.warn("subject({}) is not a uri in ontology", rawSubject);
             return null;
         }
@@ -227,11 +273,11 @@ public class QldarchOntology {
                 return null;
             }
         } else if (rawObject instanceof BNode) {
-            logger.warn("Blank-node object in ontology {}", rawObject, eu);
+            logger.warn("Blank-node object in ontology {}", rawObject);
             return null;
         } else if (rawObject instanceof Literal) {
             Literal literal = (Literal)rawObject;
-            URI datatype = literal.getDatatype();
+            org.openrdf.model.URI datatype = literal.getDatatype();
             if (XMLDatatypeUtil.isCalendarDatatype(datatype)) {
                 return literal.calendarValue();
             } else if (XMLDatatypeUtil.isIntegerDatatype(datatype)) {
@@ -250,8 +296,7 @@ public class QldarchOntology {
     /**
      * Set the graph containing the ontology entities.
      *
-     * Note: This will force a reload of the prefix map on the next 
-     *   lookup of a prefix or uri.
+     * Note: This will force a reload of the entities map
      */
     public synchronized void setEntityGraph(String graph) {
         this.entities = null;
@@ -263,10 +308,23 @@ public class QldarchOntology {
     }
 
     /**
+     * Set the query for entities from the ontology.
+     *
+     * Note: This will force a reload of the entities map
+     */
+    public synchronized void setEntityQuery(String query) {
+        this.entities = null;
+        this.entityQuery = query;
+    }
+
+    public String getEntityQuery() {
+        return this.entityQuery;
+    }
+
+    /**
      * Set the graph containing the ontology properties.
      *
-     * Note: This will force a reload of the properties map on the next 
-     *   lookup of a prefix or uri.
+     * Note: This will force a reload of the properties map
      */
     public synchronized void setPropertiesGraph(String graph) {
         this.properties = null;
@@ -277,18 +335,33 @@ public class QldarchOntology {
         return this.propertiesGraph;
     }
 
-    public void setConnection(SesameConnectionPool connectionPool) {
+    /**
+     * Set the query for entities from the ontology.
+     *
+     * Note: This will force a reload of the properties map
+     */
+    public synchronized void setPropertiesQuery(String query) {
+        this.properties = null;
+        this.propertiesQuery = query;
+    }
+
+    public String getPropertiesQuery() {
+        return this.propertiesQuery;
+    }
+
+    public void setConnectionPool(SesameConnectionPool connectionPool) {
         this.connectionPool = connectionPool;
     }
 
-    public synchronized SesameConnectionPool getConnection() {
+    public synchronized SesameConnectionPool getConnectionPool() {
         if (this.connectionPool == null) {
             this.connectionPool = SesameConnectionPool.instance();
         }
         return this.connectionPool;
     }
 
-    public Value convertObject(URI property, Object object) throws MetadataRespositoryException {
+    // FIXME: This MUST be broken up into a utility class of its own so it can be tested properly.
+    public Value convertObject(URI property, Object object) throws MetadataRepositoryException {
         if (!properties.containsKey(property)) {
             return new LiteralImpl(object.toString());
         } else {
@@ -296,10 +369,10 @@ public class QldarchOntology {
 
             if (propertyDesc.get(RDF_TYPE).contains(OWL_OBJECT_PROPERTY)) {
                 try {
-                    return new URIImpl(new URI(object.toString()));
-                } catch (URISyntaxException eu) {
+                    return new URIImpl(object.toString());
+                } catch (IllegalArgumentException ei) {
                     logger.debug("ObjectProperty value({}) could not be converted to URI",
-                            object, eu);
+                            object, ei);
                     return new LiteralImpl(object.toString());
                 }
             } else {
@@ -308,15 +381,20 @@ public class QldarchOntology {
                     if (XSD_STRING.equals(rng)) {
                         return new LiteralImpl(object.toString());
                     } else if (XSD_DATE.equals(rng)) {
-                        try {
-                            return new CalendarLiteralImpl(object.toString());
-                        } catch (IllegalArgumentException ei) {
-                            logger.debug("Range of date, but object did not convert {}", object, ei);
-                            continue;
+                        if (object instanceof XMLGregorianCalendar) {
+                            return new CalendarLiteralImpl((XMLGregorianCalendar)object);
+                        } else {
+                            try {
+                                return new CalendarLiteralImpl(
+                                        XMLDatatypeUtil.parseCalendar(object.toString()));
+                            } catch (NumberFormatException en) {
+                                logger.debug("Range of date, but object did not convert {}", object, en);
+                                continue;
+                            }
                         }
                     } else if (XSD_BOOLEAN.equals(rng)) {
                         if (object instanceof Boolean) {
-                            return new BooleanLiteralImpl(object.booleanValue());
+                            return new BooleanLiteralImpl(((Boolean)object).booleanValue());
                         } else if (object instanceof String) {
                             String s = ((String)object).toLowerCase();
                             if (s.equals("true") || s.equals("false")) {
@@ -345,5 +423,19 @@ public class QldarchOntology {
                 return new LiteralImpl(object.toString());
             }
         }
+    }
+
+    private Multimap<URI, URI> indexByType(Map<URI, Multimap<URI, Object>> entities)
+            throws MetadataRepositoryException {
+        Multimap<URI, URI> byType = HashMultimap.create();
+
+        for (URI entity : entities.keySet()) {
+            Iterable<URI> types = Iterables.filter(entities.get(entity).get(RDF_TYPE), URI.class);
+            for (URI type : types) {
+                byType.put(type, entity);
+            }
+        }
+
+        return byType;
     }
 }

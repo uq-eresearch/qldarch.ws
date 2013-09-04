@@ -1,8 +1,15 @@
 package net.qldarch.web.service;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.google.common.collect.ImmutableBiMap;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Value;
-import org.openrdf.query.*;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.MalformedQueryException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
@@ -12,10 +19,9 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-import com.google.common.collect.ImmutableBiMap;
 
 public class KnownPrefixes {
     public static Logger logger = LoggerFactory.getLogger(KnownPrefixes.class);
@@ -41,7 +47,7 @@ public class KnownPrefixes {
 
     public static URI resolve(String uriString) throws MetadataRepositoryException {
         if (uriString == null) throw new IllegalArgumentException("URI cannot be null");
-        Matcher matcher = PREFIXED_URI.match(uriString);
+        Matcher matcher = PREFIXED_URI.matcher(uriString);
 
         if (!matcher.matches()) {
             logger.debug("{} fails URI prefix validation", uriString);
@@ -74,7 +80,6 @@ public class KnownPrefixes {
             }
         }
     }
-
 
     /*
      * Factory field/method.

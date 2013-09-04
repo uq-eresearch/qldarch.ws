@@ -1,9 +1,18 @@
 package net.qldarch.web.service;
 
+import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.http.HTTPRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * This is dodgy, and needs to be enhanced, but will do for now.
  */
 public class SesameConnectionPool {
+    public static Logger logger = LoggerFactory.getLogger(SesameConnectionPool.class);
+
     public static final String DEFAULT_SERVER_URI = "http://localhost:8080/openrdf-sesame";
     public static final String DEFAULT_REPO_NAME = "QldarchMetadataServer";
 
@@ -34,7 +43,7 @@ public class SesameConnectionPool {
     }
 
     public void performOperation(RepositoryOperation operation)
-            throws MetadataRepositoryOperation {
+            throws MetadataRepositoryException {
         RepositoryConnection conn = null;
         try {
             conn = repo.getConnection();
@@ -44,7 +53,7 @@ public class SesameConnectionPool {
             throw em;
         } catch (RepositoryException er) {
             logger.warn("Error performing operation", er);
-            throw new MetadataRepositoryOperation("Error performing operation", er);
+            throw new MetadataRepositoryException("Error performing operation", er);
         } finally {
             try {
                 if (conn != null && conn.isOpen()) {
