@@ -1,20 +1,20 @@
 package net.qldarch.web.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
-import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.apache.shiro.subject.Subject;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Collection;
 import java.util.GregorianCalendar;
@@ -43,11 +43,10 @@ public class ReferenceSummaryResource {
     public static Logger logger = LoggerFactory.getLogger(ReferenceSummaryResource.class);
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
 
-    public static String USER_REFERENCE_GRAPH_FORMAT = "http://qldarch.net/users/%s/references";
-
     private QldarchOntology ontology = null;
     private SesameConnectionPool connectionPool = null;
 
+    /*
     public static String summaryQuery(Collection<String> types) {
         StringBuilder builder = new StringBuilder(
                 "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
@@ -123,18 +122,24 @@ public class ReferenceSummaryResource {
 
         return new SparqlToJsonString().performQuery(descriptionQuery(ids));
     }
-
+*/
     @POST
-    @Path("description/")
-    @Produces("text/plain")
+    @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @RequiresPermissions("create:annotation")
-    public Response addReference(RdfDescription rdf) {
-        // Check User Authz
-        Subject currentUser = SecurityUtils.getSubject();
-        String username = Validators.username((String)currentUser.getPrincipal());
+    public Response addReference(String json) throws IOException {
+        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
-        URI userReferenceGraph = URI.create(String.format(USER_REFERENCE_GRAPH_FORMAT, username));
+        // Check User Authz
+        User user = User.currentUser();
+
+        if (user.isAnon()) {
+            return Response
+                .status(Status.FORBIDDEN)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("Anonymous users are not permitted to create annotations")
+                .build();
+        }
 
         // Check Reference type
         List<URI> types = rdf.getType();
@@ -155,6 +160,7 @@ public class ReferenceSummaryResource {
         }
 
         URI type = types.get(0);
+        URI userReferenceGraph = user.getReferenceGraph();
 
         // Generate id
         URI id = newReferenceId(userReferenceGraph, type);
@@ -174,7 +180,7 @@ public class ReferenceSummaryResource {
 
         // Return
         return Response.created(id)
-            .entity(rdf)
+//            .entity(new ObjectMapper().writeValueAsString(rdf))
             .build();
     }
 

@@ -116,7 +116,7 @@ public class RdfDescription {
         return this.ontology;
     }
 
-    public void setOntology(QldarchOntology ontology) {
+    public synchronized void setOntology(QldarchOntology ontology) {
         this.ontology = ontology;
     }
 }
