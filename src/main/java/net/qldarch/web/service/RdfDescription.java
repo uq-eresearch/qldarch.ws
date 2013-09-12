@@ -1,11 +1,14 @@
 package net.qldarch.web.service;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
@@ -16,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +29,8 @@ import static com.google.common.collect.Collections2.filter;
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.base.Predicates.notNull;
 
+
+@JsonIgnoreProperties({"ontology", "properties", "type"})
 public class RdfDescription {
     public static Logger logger = LoggerFactory.getLogger(RdfDescription.class);
 
@@ -39,7 +45,6 @@ public class RdfDescription {
         this.ontology = null;
     }
 
-    @JsonIgnore
     public List<URI> getType() {
         Collection<Object> typeObj = properties.get(RDF_TYPE);
         return ImmutableList.copyOf(filter(transform(typeObj, toURI), notNull()));
@@ -50,7 +55,7 @@ public class RdfDescription {
         this.uri = uri;
     }
 
-    @JsonIgnore
+    @JsonProperty(value="uri")
     public URI getURI() {
         return this.uri;
     }
@@ -70,7 +75,25 @@ public class RdfDescription {
         properties.put(nameURI, value);
     }
 
-    @JsonIgnore
+    @JsonAnyGetter
+    public Map<URI, Object> getProperties() {
+        Map<URI, Object> result = Maps.newHashMap();
+        for (URI key : properties.keySet()) {
+            Collection<Object> entry = properties.get(key);
+            switch (entry.size()) {
+                case 0:
+                    continue;
+                case 1:
+                    result.put(key, entry.toArray()[0]);
+                    break;
+                default:
+                    result.put(key, new ArrayList<Object>(entry));
+            }
+        }
+
+        return result;
+    }
+
     public Collection<Object> getValues(URI name) {
         return properties.get(name);
     }
@@ -98,14 +121,17 @@ public class RdfDescription {
         }
     };
 
-    public Iterable<Statement> asStatements(URI subject)
+    public Iterable<Statement> asStatements()
             throws MetadataRepositoryException {
-        return filter(transform(properties.entries(), toStatements(subject)), notNull());
+        if (this.uri == null) {
+            throw new MetadataRepositoryException("Generating statements for unidentifed subject");
+        }
+        return filter(transform(properties.entries(), toStatements()), notNull());
     }
 
-    private Function<Map.Entry<URI,Object>,Statement> toStatements(URI subject) 
+    private Function<Map.Entry<URI,Object>,Statement> toStatements() 
             throws MetadataRepositoryException {
-        final URIImpl subjectURI = new URIImpl(subject.toString());
+        final URIImpl subjectURI = new URIImpl(uri.toString());
 
         return new Function<Map.Entry<URI,Object>,Statement>() {
             public Statement apply(Map.Entry<URI,Object> entry) {
