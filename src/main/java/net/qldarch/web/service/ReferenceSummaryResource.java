@@ -174,13 +174,14 @@ public class ReferenceSummaryResource {
         // Generate id
         URI id = newReferenceId(userReferenceGraph, type);
 
+        rdf.setURI(id);
         rdf.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
         rdf.replaceProperty(QA_ASSERTION_DATE, new Date());
         rdf.replaceProperty(QA_DOCUMENTED_BY, rdf.getValues(QA_SUBJECT));
 
         // Generate and Perform insert query
         try {
-            performInsert(id, rdf, userReferenceGraph);
+            performInsert(rdf, userReferenceGraph);
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insert id:{}, graph:{}, rdf:{})",
                     id, userReferenceGraph, rdf, em);
@@ -191,9 +192,11 @@ public class ReferenceSummaryResource {
                 .build();
         }
 
+        String entity = new ObjectMapper().writeValueAsString(rdf);
+        logger.trace("Returning successful entity: {}", entity);
         // Return
         return Response.created(id)
-//            .entity(new ObjectMapper().writeValueAsString(rdf))
+            .entity(entity)
             .build();
     }
 
@@ -230,16 +233,15 @@ public class ReferenceSummaryResource {
         return Long.toString(delta);
     }
 
-    private void performInsert(final URI id, final RdfDescription rdf, final URI userReferenceGraph)
+    private void performInsert(final RdfDescription rdf, final URI userReferenceGraph)
             throws MetadataRepositoryException {
         this.getConnectionPool().performOperation(new RepositoryOperation() {
             public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {
                 URIImpl context = new URIImpl(userReferenceGraph.toString());
-                conn.add(rdf.asStatements(id), new URIImpl(userReferenceGraph.toString()));
+                conn.add(rdf.asStatements(), new URIImpl(userReferenceGraph.toString()));
             }
         });
-        rdf.setURI(id);
     }
 
     public void setConnectionPool(SesameConnectionPool connectionPool) {

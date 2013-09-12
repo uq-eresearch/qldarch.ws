@@ -159,10 +159,11 @@ public class EntitySummaryResource {
 
         // Generate id
         URI id = newEntityId(userEntityGraph, type);
+        rdf.setURI(id);
 
         // Generate and Perform insert query
         try {
-            performInsert(id, rdf, userEntityGraph);
+            performInsert(rdf, userEntityGraph);
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insert id:{}, graph:{}, rdf:{})",
                     id, userEntityGraph, rdf, em);
@@ -212,16 +213,15 @@ public class EntitySummaryResource {
         return Long.toString(delta);
     }
 
-    private void performInsert(final URI id, final RdfDescription rdf, final URI userEntityGraph)
+    private void performInsert(final RdfDescription rdf, final URI userEntityGraph)
             throws MetadataRepositoryException {
         this.getConnectionPool().performOperation(new RepositoryOperation() {
             public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {
                 URIImpl context = new URIImpl(userEntityGraph.toString());
-                conn.add(rdf.asStatements(id), new URIImpl(userEntityGraph.toString()));
+                conn.add(rdf.asStatements(), new URIImpl(userEntityGraph.toString()));
             }
         });
-        rdf.setURI(id);
     }
 
     public void setConnectionPool(SesameConnectionPool connectionPool) {
