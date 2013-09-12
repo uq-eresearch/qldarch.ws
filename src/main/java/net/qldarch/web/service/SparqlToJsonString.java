@@ -75,8 +75,6 @@ public class SparqlToJsonString {
                     property.get(p.toString()).add(o);
                 }
 
-                logger.warn("Result: " + propertyGraph.toString());
-
                 pw.println("{");
                 boolean firsta = true;
                 for (String str : propertyGraph.keySet()) {

@@ -12,6 +12,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.BooleanLiteralImpl;
 import org.openrdf.model.impl.CalendarLiteralImpl;
+import org.openrdf.model.impl.DecimalLiteralImpl;
 import org.openrdf.model.impl.IntegerLiteralImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
@@ -27,12 +28,17 @@ import org.openrdf.repository.http.HTTPRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Map;
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 public class QldarchOntology {
@@ -49,26 +55,27 @@ public class QldarchOntology {
     public static final URI XSD_STRING = URI.create("http://www.w3.org/2001/XMLSchema#string");
     private static final URI XSD_DATE = URI.create("http://www.w3.org/2001/XMLSchema#date");
     private static final URI XSD_INTEGER = URI.create("http://www.w3.org/2001/XMLSchema#integer");
+    private static final URI XSD_DECIMAL = URI.create("http://www.w3.org/2001/XMLSchema#decimal");
     public static final URI XSD_BOOLEAN = URI.create("http://www.w3.org/2001/XMLSchema#boolean");
 
     public static final String DEFAULT_ENTITY_QUERY = 
-        "@PREFIX qldarch: <http://qldarch.net/ns/rdf/2012-06/terms#> " +
-        "@PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " +
-        "select distinct ?entity ?prop ?value " +
+        "PREFIX qldarch: <http://qldarch.net/ns/rdf/2012-06/terms#> " +
+        "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " +
+        "select distinct ?s ?p ?o " +
         "from <%s> " +
         "where { " +
-        "  ?entity rdfs:subClassOf qldarch:Entity . " +
-        "  ?entity ?prop ?value . " +
+        "  ?s rdfs:subClassOf qldarch:Entity . " +
+        "  ?s ?p ?o . " +
         "}";
 
     public static final String DEFAULT_PROPERTIES_QUERY = 
-        "@PREFIX qldarch: <http://qldarch.net/ns/rdf/2012-06/terms#> " +
-        "@PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> " +
-        "select distinct ?predicate ?prop ?value " +
+        "PREFIX qldarch: <http://qldarch.net/ns/rdf/2012-06/terms#> " +
+        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> " +
+        "select distinct ?s ?p ?o " +
         "from <%s> " +
         "where { " +
-        "  ?predicate rdf:type rdf:Property . " +
-        "  ?predicate ?prop ?value . " +
+        "  ?s rdf:type rdf:Property . " +
+        "  ?s ?p ?o . " +
         "}";
 
     /*
@@ -155,8 +162,8 @@ public class QldarchOntology {
             public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {
                 QldarchOntology.this.properties = loadStatements(conn,
-                    QldarchOntology.this.getPropertiesGraph(),
-                    QldarchOntology.this.getPropertiesQuery());
+                    QldarchOntology.this.getPropertiesQuery(),
+                    QldarchOntology.this.getPropertiesGraph());
             }
         });
     }
@@ -187,6 +194,7 @@ public class QldarchOntology {
     private Map<URI,Multimap<URI,Object>>
             loadStatements(RepositoryConnection conn, String baseQuery, String graph)
             throws RepositoryException, MetadataRepositoryException {
+        logger.trace("baseQuery: {}, graph: {}", baseQuery, graph);
         String query = String.format(baseQuery, graph);
         logger.trace("Loading entities with query: {}", query);
 
@@ -221,8 +229,10 @@ public class QldarchOntology {
 
             return map;
         } catch (MalformedQueryException em) {
+            logger.warn("Failed to load ontology from store", em);
             throw new MetadataRepositoryException("Failed to load ontology from store", em);
         } catch (QueryEvaluationException eq) {
+            logger.warn("Failed to load ontology from store", eq);
             throw new MetadataRepositoryException("Failed to load ontology from store", eq);
         }
     }
@@ -278,10 +288,14 @@ public class QldarchOntology {
         } else if (rawObject instanceof Literal) {
             Literal literal = (Literal)rawObject;
             org.openrdf.model.URI datatype = literal.getDatatype();
-            if (XMLDatatypeUtil.isCalendarDatatype(datatype)) {
+            if (datatype == null) {
+                return literal.toString();
+            } else if (XMLDatatypeUtil.isCalendarDatatype(datatype)) {
                 return literal.calendarValue();
             } else if (XMLDatatypeUtil.isIntegerDatatype(datatype)) {
                 return literal.intValue();
+            } else if (XMLDatatypeUtil.isDecimalDatatype(datatype)) {
+                return literal.decimalValue();
             } else if (XMLDatatypeUtil.isValidBoolean(literal.toString())) {
                 return literal.booleanValue();
             } else {
@@ -362,6 +376,9 @@ public class QldarchOntology {
 
     // FIXME: This MUST be broken up into a utility class of its own so it can be tested properly.
     public Value convertObject(URI property, Object object) throws MetadataRepositoryException {
+        logger.trace("Converting {} :: {} of class {}", property, object, object.getClass());
+        Map<URI, Multimap<URI, Object>> properties = this.getProperties();
+
         if (!properties.containsKey(property)) {
             return new LiteralImpl(object.toString());
         } else {
@@ -383,12 +400,34 @@ public class QldarchOntology {
                     } else if (XSD_DATE.equals(rng)) {
                         if (object instanceof XMLGregorianCalendar) {
                             return new CalendarLiteralImpl((XMLGregorianCalendar)object);
+                        } else if (object instanceof Date) {
+                            GregorianCalendar cal = new GregorianCalendar();
+                            cal.setTimeInMillis(((Date)object).getTime());
+                            try {
+                                return new CalendarLiteralImpl(
+                                    DatatypeFactory.newInstance().newXMLGregorianCalendar(cal));
+                            } catch (DatatypeConfigurationException ed0) {
+                                logger.debug("Range of date, but object did not convert {}",
+                                        object, ed0);
+                                continue;
+                            }
+                        } else if (object instanceof GregorianCalendar) {
+                            try {
+                                return new CalendarLiteralImpl(
+                                        DatatypeFactory.newInstance().newXMLGregorianCalendar(
+                                            (GregorianCalendar)object));
+                            } catch (DatatypeConfigurationException ed1) {
+                                logger.debug("Range of date, but object did not convert {}",
+                                        object, ed1);
+                                continue;
+                            }
                         } else {
                             try {
                                 return new CalendarLiteralImpl(
                                         XMLDatatypeUtil.parseCalendar(object.toString()));
-                            } catch (NumberFormatException en) {
-                                logger.debug("Range of date, but object did not convert {}", object, en);
+                            } catch (IllegalArgumentException ei) {
+                                logger.debug("Range of date, but object did not convert {}",
+                                        object, ei);
                                 continue;
                             }
                         }
@@ -411,14 +450,29 @@ public class QldarchOntology {
                             try {
                                 return new IntegerLiteralImpl(new BigInteger(object.toString()));
                             } catch (NumberFormatException en) {
-                                logger.debug("Range of int, but object did not convert {}", object, en);
+                                logger.debug("Range of int, but object did not convert {}",
+                                        object, en);
                                 continue;
                             }
+                        }
+                    } else if (XSD_DECIMAL.equals(rng)) {
+                        try {
+                            return new DecimalLiteralImpl(
+                                    new BigDecimal(object.toString()));
+                        } catch (NumberFormatException en) {
+                            logger.debug("Range of decimal, but object did not convert {}",
+                                    object, en);
+                            continue;
                         }
                     }
                 }
 
-                logger.info("Input({}) did not match any range declaration in {}", object, ranges);
+                logger.trace("Property {} has class {}, Object {} has class {}",
+                        property, property.getClass(), object, object.getClass());
+                logger.trace("Property {} has description: {}", property, propertyDesc);
+                logger.info(
+                        "Object({}) for property({}) did not match any range declaration in {}",
+                        object, property, ranges);
 
                 return new LiteralImpl(object.toString());
             }

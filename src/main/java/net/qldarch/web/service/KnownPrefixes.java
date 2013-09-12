@@ -32,7 +32,7 @@ public class KnownPrefixes {
     public static final String XSD_STRING = "http://www.w3.org/2001/XMLSchema#string";
 
     public static final String PREFIX_MAP_QUERY_FORMAT = 
-        "@PREFIX qaint: <http://qldarch.net/ns/rdf/2013-08/internal#> " +
+        "PREFIX qaint: <http://qldarch.net/ns/rdf/2013-08/internal#> " +
         "select distinct ?prefix ?uri " + 
         "from <%s> " +
         "where { " +
@@ -50,8 +50,13 @@ public class KnownPrefixes {
         Matcher matcher = PREFIXED_URI.matcher(uriString);
 
         if (!matcher.matches()) {
-            logger.debug("{} fails URI prefix validation", uriString);
-            throw new MetadataRepositoryException("URIString fails URI prefix validation");
+            try {
+                return new URI(uriString);
+            } catch (URISyntaxException eu0) {
+                logger.debug("URIString fails URI prefix validation", eu0);
+                throw new MetadataRepositoryException(
+                        "URIString fails URI prefix validation", eu0);
+            }
         }
 
         if (matcher.groupCount() != 2) {
@@ -76,7 +81,8 @@ public class KnownPrefixes {
                 return prefix.resolve(suffix);
             } catch (URISyntaxException eu2) {
                 logger.debug("Suffix was not a valid relative URI {}", matcher.group(2), eu2);
-                throw new MetadataRepositoryException("Invalid URI in resolution against prefix");
+                throw new MetadataRepositoryException(
+                        "Invalid URI in resolution against prefix", eu2);
             }
         }
     }
@@ -177,7 +183,7 @@ public class KnownPrefixes {
                 Value rawURI = bs.getValue("uri");
 
                 String prefix = validatePrefix(rawPrefix, rawURI);
-                URI uri = validateURI(rawPrefix, rawURI);
+                URI uri = validateURI(rawURI, rawPrefix);
 
                 if (prefix == null || uri == null) {
                     logger.debug("Error in prefix query result. Skipping entry ({}, {})",
@@ -260,7 +266,6 @@ public class KnownPrefixes {
             .put("foaf", URI.create("http://xmlns.com/foaf/0.1/"))
             .put("skos", URI.create("http://www.w3.org/2004/02/skos/core#"))
             .put("geo", URI.create("http://www.w3.org/2003/01/geo/wgs84_pos#"))
-            .put("http", URI.create("http:"))
             .build();
     }
 
