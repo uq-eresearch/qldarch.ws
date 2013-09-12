@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -67,6 +68,19 @@ public class RdfDescription {
     public void addProperty(String name, Object value) throws MetadataRepositoryException {
         URI nameURI = KnownPrefixes.resolve(name);
         properties.put(nameURI, value);
+    }
+
+    @JsonIgnore
+    public Collection<Object> getValues(URI name) {
+        return properties.get(name);
+    }
+
+    public void replaceProperty(URI name, Object value) {
+        replaceProperty(name, Collections.singleton(value));
+    }
+
+    public void replaceProperty(URI name, Iterable<? extends Object> values) {
+        properties.replaceValues(name, values);
     }
 
     private static Function<Object,URI> toURI = new Function<Object,URI>() {

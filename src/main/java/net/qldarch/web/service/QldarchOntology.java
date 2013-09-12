@@ -33,8 +33,12 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Map;
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 public class QldarchOntology {
@@ -372,6 +376,7 @@ public class QldarchOntology {
 
     // FIXME: This MUST be broken up into a utility class of its own so it can be tested properly.
     public Value convertObject(URI property, Object object) throws MetadataRepositoryException {
+        logger.trace("Converting {} :: {} of class {}", property, object, object.getClass());
         Map<URI, Multimap<URI, Object>> properties = this.getProperties();
 
         if (!properties.containsKey(property)) {
@@ -395,12 +400,34 @@ public class QldarchOntology {
                     } else if (XSD_DATE.equals(rng)) {
                         if (object instanceof XMLGregorianCalendar) {
                             return new CalendarLiteralImpl((XMLGregorianCalendar)object);
+                        } else if (object instanceof Date) {
+                            GregorianCalendar cal = new GregorianCalendar();
+                            cal.setTimeInMillis(((Date)object).getTime());
+                            try {
+                                return new CalendarLiteralImpl(
+                                    DatatypeFactory.newInstance().newXMLGregorianCalendar(cal));
+                            } catch (DatatypeConfigurationException ed0) {
+                                logger.debug("Range of date, but object did not convert {}",
+                                        object, ed0);
+                                continue;
+                            }
+                        } else if (object instanceof GregorianCalendar) {
+                            try {
+                                return new CalendarLiteralImpl(
+                                        DatatypeFactory.newInstance().newXMLGregorianCalendar(
+                                            (GregorianCalendar)object));
+                            } catch (DatatypeConfigurationException ed1) {
+                                logger.debug("Range of date, but object did not convert {}",
+                                        object, ed1);
+                                continue;
+                            }
                         } else {
                             try {
                                 return new CalendarLiteralImpl(
                                         XMLDatatypeUtil.parseCalendar(object.toString()));
-                            } catch (NumberFormatException en) {
-                                logger.debug("Range of date, but object did not convert {}", object, en);
+                            } catch (IllegalArgumentException ei) {
+                                logger.debug("Range of date, but object did not convert {}",
+                                        object, ei);
                                 continue;
                             }
                         }
@@ -423,7 +450,8 @@ public class QldarchOntology {
                             try {
                                 return new IntegerLiteralImpl(new BigInteger(object.toString()));
                             } catch (NumberFormatException en) {
-                                logger.debug("Range of int, but object did not convert {}", object, en);
+                                logger.debug("Range of int, but object did not convert {}",
+                                        object, en);
                                 continue;
                             }
                         }
@@ -432,7 +460,8 @@ public class QldarchOntology {
                             return new DecimalLiteralImpl(
                                     new BigDecimal(object.toString()));
                         } catch (NumberFormatException en) {
-                            logger.debug("Range of decimal, but object did not convert {}", object, en);
+                            logger.debug("Range of decimal, but object did not convert {}",
+                                    object, en);
                             continue;
                         }
                     }
@@ -440,8 +469,10 @@ public class QldarchOntology {
 
                 logger.trace("Property {} has class {}, Object {} has class {}",
                         property, property.getClass(), object, object.getClass());
-                logger.info("Object({}) for property({}) did not match any range declaration in {}",
-                        object, property, ranges, new Throwable());
+                logger.trace("Property {} has description: {}", property, propertyDesc);
+                logger.info(
+                        "Object({}) for property({}) did not match any range declaration in {}",
+                        object, property, ranges);
 
                 return new LiteralImpl(object.toString());
             }

@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collection;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Random;
@@ -42,6 +43,14 @@ import static javax.ws.rs.core.Response.Status;
 public class ReferenceSummaryResource {
     public static Logger logger = LoggerFactory.getLogger(ReferenceSummaryResource.class);
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
+    public static final URI QA_ASSERTED_BY =
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#assertedBy");
+    public static final URI QA_SUBJECT =
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#subject");
+    public static final URI QA_ASSERTION_DATE =
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#assertionDate");
+    public static final URI QA_DOCUMENTED_BY =
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#documentedBy");
 
     private QldarchOntology ontology = null;
     private SesameConnectionPool connectionPool = null;
@@ -164,6 +173,10 @@ public class ReferenceSummaryResource {
 
         // Generate id
         URI id = newReferenceId(userReferenceGraph, type);
+
+        rdf.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
+        rdf.replaceProperty(QA_ASSERTION_DATE, new Date());
+        rdf.replaceProperty(QA_DOCUMENTED_BY, rdf.getValues(QA_SUBJECT));
 
         // Generate and Perform insert query
         try {
