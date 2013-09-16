@@ -15,7 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -51,29 +53,41 @@ public class ReferenceSummaryResource {
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#assertionDate");
     public static final URI QA_DOCUMENTED_BY =
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#documentedBy");
+    public static final URI QA_REFERENCE_RELATION_TYPE = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#ReferenceRelation");
+    public static final URI QAC_HAS_REFERENCE_GRAPH = 
+        URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasReferenceGraph");
+    public static final URI QAC_CATALOG_GRAPH = 
+        URI.create("http://qldarch.net/rdf/2013-09/catalog");
+
+    public static String SHARED_REFERENCE_GRAPH = "http://qldarch.net/rdf/2013-09/references";
 
     private QldarchOntology ontology = null;
     private SesameConnectionPool connectionPool = null;
 
-    /*
-    public static String summaryQuery(Collection<String> types) {
-        StringBuilder builder = new StringBuilder(
-                "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "select ?s ?p ?o " +
-                "from <http://qldarch.net/rdf/2013/09/references#> " +     // Inferred entities
-                "from named <http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "where { " + 
-                "  ?s a ?t." +
-                "  ?s ?p ?o ." +
-                "  GRAPH <http://qldarch.net/ns/rdf/2012-06/terms#> { " +
-                "    ?p :summaryProperty true . " +
-                "  } " +
-                "} BINDINGS ?t { (<");
+    public static String referenceQuery(URI reference, BigDecimal time, BigDecimal duration) {
+        BigDecimal end = time.add(duration);
 
-        String query = Joiner.on(">) (<")
-            .appendTo(builder, transform(types, toStringFunction()))
-            .append(">) }")
-            .toString();
+        String formatStr = 
+                "PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#> " +
+                "PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#> " +
+                "select ?s ?p ?o " +
+                "where { " + 
+                "  graph <http://qldarch.net/rdf/2013-09/catalog> { " +
+                "    ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasReferenceGraph> ?g. " +
+                "  } . " +
+                "  graph ?g { " +
+                "    ?s a :ReferenceRelation . " +
+                "    ?s :subject <%s> . " +
+                "    ?s :regionStart ?start . " +
+                "    ?s :regionEnd ?end . " +
+                "    ?s ?p ?o ." +
+                "  } . " +
+                "  FILTER ( xsd:decimal(\"%s\") <= ?end && " +
+                "           xsd:decimal(\"%s\") >= ?start ) " +
+                "}";
+
+        String query = String.format(formatStr, reference, time, end);
 
         logger.debug("ReferenceResource performing SPARQL query: {}", query);
         
@@ -82,20 +96,65 @@ public class ReferenceSummaryResource {
 
     @GET
     @Produces("application/json")
-    @Path("summary/{type}")
-    public String performGet(
-            @PathParam("type") String type,
-            @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
-        logger.debug("Querying type: {}, typelist: {}", type, typelist);
+    public Response performGet(
+            @DefaultValue("") @QueryParam("RESOURCE") String resourceStr,
+            @DefaultValue("") @QueryParam("TIME") String timeStr,
+            @DefaultValue("0.0") @QueryParam("DURATION") String durationStr) {
 
-        Set<String> types = newHashSet(type);
-        Iterables.addAll(types, Splitter.on(',').trimResults().omitEmptyStrings().split(typelist));
+        logger.debug("Querying references for resource: {}, time: {}, duration: {}",
+                resourceStr, timeStr, durationStr);
 
-        logger.debug("Raw types: {}", types);
+        if (resourceStr.isEmpty()) {
+            logger.info("Bad request received. No resource provided.");
+            return Response
+                .status(Status.BAD_REQUEST)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("QueryParam RESOURCE missing")
+                .build();
+        }
+        if (timeStr.isEmpty()) {
+            logger.info("Bad request received. No time provided.");
+            return Response
+                .status(Status.BAD_REQUEST)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("QueryParam TIME missing")
+                .build();
+        }
 
-        return new SparqlToJsonString().performQuery(summaryQuery(types));
+        URI resource = null;
+        BigDecimal time = null;
+        BigDecimal duration = null;
+        try {
+            resource = new URI(resourceStr);
+            time = new BigDecimal(timeStr);
+            duration = new BigDecimal(durationStr);
+        } catch (URISyntaxException eu) {
+            logger.info("Malformed URI submitted to references request: {}", resourceStr, eu);
+            return Response
+                .status(Status.BAD_REQUEST)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("QueryParam RESOURCE malformed")
+                .build();
+        } catch (NumberFormatException en) {
+            logger.info("Malformed xsd:decimal submitted to references request: {}/{}",
+                timeStr, durationStr, en);
+            return Response
+                .status(Status.BAD_REQUEST)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("QueryParam TIME or DURATION malformed")
+                .build();
+        }
+
+        logger.debug("Raw references query: {}, {}, {}", resource, time, duration);
+
+        String result = new SparqlToJsonString().performQuery(
+                referenceQuery(resource, time, duration));
+
+        return Response.ok()
+            .entity(result)
+            .build();
     }
-
+/*
     public static String descriptionQuery(Collection<String> ids) {
         StringBuilder builder = new StringBuilder(
                 "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
@@ -181,7 +240,7 @@ public class ReferenceSummaryResource {
 
         // Generate and Perform insert query
         try {
-            performInsert(rdf, userReferenceGraph);
+            performInsert(rdf, user);
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insert id:{}, graph:{}, rdf:{})",
                     id, userReferenceGraph, rdf, em);
@@ -233,13 +292,17 @@ public class ReferenceSummaryResource {
         return Long.toString(delta);
     }
 
-    private void performInsert(final RdfDescription rdf, final URI userReferenceGraph)
+    private void performInsert(final RdfDescription rdf, final User user)
             throws MetadataRepositoryException {
         this.getConnectionPool().performOperation(new RepositoryOperation() {
             public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {
-                URIImpl context = new URIImpl(userReferenceGraph.toString());
-                conn.add(rdf.asStatements(), new URIImpl(userReferenceGraph.toString()));
+                URIImpl userURI = new URIImpl(user.getUserURI().toString());
+                URIImpl hasRefGraphURI = new URIImpl(QAC_HAS_REFERENCE_GRAPH.toString());
+                URIImpl contextURI = new URIImpl(user.getReferenceGraph().toString());
+                URIImpl catalogURI = new URIImpl(QAC_CATALOG_GRAPH.toString());
+                conn.add(userURI, hasRefGraphURI, contextURI, catalogURI);
+                conn.add(rdf.asStatements(), contextURI);
             }
         });
     }
