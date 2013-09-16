@@ -29,7 +29,6 @@ import static com.google.common.collect.Collections2.filter;
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.base.Predicates.notNull;
 
-
 @JsonIgnoreProperties({"ontology", "properties", "type"})
 public class RdfDescription {
     public static Logger logger = LoggerFactory.getLogger(RdfDescription.class);
