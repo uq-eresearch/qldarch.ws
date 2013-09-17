@@ -386,7 +386,20 @@ public class QldarchOntology {
 
             if (propertyDesc.get(RDF_TYPE).contains(OWL_OBJECT_PROPERTY)) {
                 try {
-                    return new URIImpl(object.toString());
+                    if (object instanceof RdfDescription) {
+                        RdfDescription rdf = (RdfDescription)object;
+                        URI uri = rdf.getURI();
+                        if (uri == null) {
+                            logger.error("Storage of blank nodes not currently supported: {} => {}",
+                                    property, object);
+                            throw new MetadataRepositoryException(
+                                    "Storage of blank nodes not currently supported");
+                        } 
+
+                        return new URIImpl(uri.toString());
+                    } else {
+                        return new URIImpl(object.toString());
+                    }
                 } catch (IllegalArgumentException ei) {
                     logger.debug("ObjectProperty value({}) could not be converted to URI",
                             object, ei);

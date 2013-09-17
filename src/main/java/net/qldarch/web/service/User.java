@@ -11,6 +11,7 @@ public class User {
     public static Logger logger = LoggerFactory.getLogger(User.class);
 
     public static String USER_REFERENCE_GRAPH_FORMAT = "http://qldarch.net/users/%s/references";
+    public static String USER_ANNOTATION_GRAPH_FORMAT = "http://qldarch.net/users/%s/annotations";
     public static String USER_URI_FORMAT = "http://qldarch.net/users/%s";
 
     private String username;
@@ -36,5 +37,9 @@ public class User {
 
     public URI getReferenceGraph() {
         return URI.create(String.format(USER_REFERENCE_GRAPH_FORMAT, username));
+    }
+
+    public URI getAnnotationGraph() {
+        return URI.create(String.format(USER_ANNOTATION_GRAPH_FORMAT, username));
     }
 }

@@ -44,6 +44,18 @@ public class RdfDescription {
         this.ontology = null;
     }
 
+    public RdfDescription(Map<Object,Object> desc) throws MetadataRepositoryException {
+        this();
+
+        for (Map.Entry<Object,Object> entry : desc.entrySet()) {
+            if ("uri".equals(entry.getKey().toString())) {
+                this.setUri(entry.getValue().toString());
+            } else {
+                this.addProperty(entry.getKey().toString(), entry.getValue());
+            }
+        }
+    }
+
     public List<URI> getType() {
         Collection<Object> typeObj = properties.get(RDF_TYPE);
         return ImmutableList.copyOf(filter(transform(typeObj, toURI), notNull()));
@@ -70,8 +82,17 @@ public class RdfDescription {
 
     @JsonAnySetter
     public void addProperty(String name, Object value) throws MetadataRepositoryException {
+        logger.info("Received {} => {}::{}", name, value, value.getClass());
         URI nameURI = KnownPrefixes.resolve(name);
-        properties.put(nameURI, value);
+        if (value instanceof Map) {
+            properties.put(nameURI, new RdfDescription((Map)value));
+        } if (value instanceof List) {
+            for (Object prop : (List<?>)value) {
+                this.addProperty(name, prop);
+            }
+        } else {
+            this.properties.put(nameURI, value);
+        }
     }
 
     @JsonAnyGetter
