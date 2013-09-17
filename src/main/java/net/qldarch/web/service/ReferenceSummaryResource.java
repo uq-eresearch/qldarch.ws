@@ -154,43 +154,7 @@ public class ReferenceSummaryResource {
             .entity(result)
             .build();
     }
-/*
-    public static String descriptionQuery(Collection<String> ids) {
-        StringBuilder builder = new StringBuilder(
-                "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "select ?s ?p ?o " +
-                "from <http://qldarch.net/rdf/user/entities> " +             // User added entities
-                "from <http://qldarch.net/rdf/2012/12/resources#> where {" + // Inferred entities
-                "  ?s ?p ?o ." +
-                "} BINDINGS ?s { (<");
 
-        String query = Joiner.on(">) (<")
-            .appendTo(builder, transform(ids, toStringFunction()))
-            .append(">) }")
-            .toString();
-
-        logger.debug("ReferenceResource performing SPARQL query: {}", query);
-        
-        return query;
-    }
-
-    @GET
-    @Produces("application/json")
-    @Path("{type}/{id}")
-    public String performGet(
-            @PathParam("type") String type,
-            @PathParam("id") String id,
-            @DefaultValue("") @QueryParam("IDLIST") String idlist) {
-        logger.debug("Querying id: {}, idlist: {}", id, idlist);
-
-        Set<String> ids = newHashSet(id);
-        Iterables.addAll(ids, Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
-
-        logger.debug("Raw ids: {}", ids);
-
-        return new SparqlToJsonString().performQuery(descriptionQuery(ids));
-    }
-*/
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
