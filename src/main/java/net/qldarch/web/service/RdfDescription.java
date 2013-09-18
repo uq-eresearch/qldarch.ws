@@ -101,18 +101,18 @@ public class RdfDescription {
     }
 
     @JsonAnyGetter
-    public Map<URI, Object> getProperties() {
-        Map<URI, Object> result = Maps.newHashMap();
+    public Map<String, Object> getProperties() {
+        Map<String, Object> result = Maps.newHashMap();
         for (URI key : properties.keySet()) {
             Collection<Object> entry = properties.get(key);
             switch (entry.size()) {
                 case 0:
                     continue;
                 case 1:
-                    result.put(key, entry.toArray()[0]);
+                    result.put(key.toString(), entry.toArray()[0]);
                     break;
                 default:
-                    result.put(key, new ArrayList<Object>(entry));
+                    result.put(key.toString(), new ArrayList<Object>(entry));
             }
         }
 
