@@ -44,6 +44,18 @@ public class RdfDescription {
         this.ontology = null;
     }
 
+    public RdfDescription(Map<Object,Object> desc) throws MetadataRepositoryException {
+        this();
+
+        for (Map.Entry<Object,Object> entry : desc.entrySet()) {
+            if ("uri".equals(entry.getKey().toString())) {
+                this.setUri(entry.getValue().toString());
+            } else {
+                this.addProperty(entry.getKey().toString(), entry.getValue());
+            }
+        }
+    }
+
     public List<URI> getType() {
         Collection<Object> typeObj = properties.get(RDF_TYPE);
         return ImmutableList.copyOf(filter(transform(typeObj, toURI), notNull()));
@@ -70,23 +82,37 @@ public class RdfDescription {
 
     @JsonAnySetter
     public void addProperty(String name, Object value) throws MetadataRepositoryException {
+        logger.info("Received {} => {}::{}", name, value, value.getClass());
         URI nameURI = KnownPrefixes.resolve(name);
-        properties.put(nameURI, value);
+        if (value instanceof Map) {
+            @SuppressWarnings("unchecked")
+            RdfDescription rdfDesc = new RdfDescription((Map)value);
+            properties.put(nameURI, rdfDesc);
+            logger.info("Materializing as {} => {}::{}", nameURI, rdfDesc, rdfDesc.getClass());
+        } else if (value instanceof List) {
+            for (Object prop : (List<?>)value) {
+                this.addProperty(name, prop);
+                logger.info("Materializing as {} => {}::{}", nameURI, prop, prop.getClass());
+            }
+        } else {
+            this.properties.put(nameURI, value);
+            logger.info("Materializing as {} => {}::{}", nameURI, value, value.getClass());
+        }
     }
 
     @JsonAnyGetter
-    public Map<URI, Object> getProperties() {
-        Map<URI, Object> result = Maps.newHashMap();
+    public Map<String, Object> getProperties() {
+        Map<String, Object> result = Maps.newHashMap();
         for (URI key : properties.keySet()) {
             Collection<Object> entry = properties.get(key);
             switch (entry.size()) {
                 case 0:
                     continue;
                 case 1:
-                    result.put(key, entry.toArray()[0]);
+                    result.put(key.toString(), entry.toArray()[0]);
                     break;
                 default:
-                    result.put(key, new ArrayList<Object>(entry));
+                    result.put(key.toString(), new ArrayList<Object>(entry));
             }
         }
 
@@ -95,6 +121,11 @@ public class RdfDescription {
 
     public Collection<Object> getValues(URI name) {
         return properties.get(name);
+    }
+
+    public List<RdfDescription> getSubGraphs(URI name) {
+        Collection<Object> col = getValues(name);
+        return ImmutableList.copyOf(filter(transform(col, toGraph), notNull()));
     }
 
     public void replaceProperty(URI name, Object value) {
@@ -107,7 +138,9 @@ public class RdfDescription {
 
     private static Function<Object,URI> toURI = new Function<Object,URI>() {
         public URI apply(Object o) {
-            if (!(o instanceof String)) {
+            if (o instanceof URI) {
+                return (URI)o;
+            } else if (!(o instanceof String)) {
                 return null;
             } else {
                 try {
@@ -119,6 +152,17 @@ public class RdfDescription {
             }
         }
     };
+
+    private static class ToGraph implements Function<Object,RdfDescription> {
+        public RdfDescription apply(Object o) {
+            if (o instanceof RdfDescription) {
+                return (RdfDescription)o;
+            } else {
+                return null;
+            }
+        }
+    };
+    private static ToGraph toGraph = new ToGraph();
 
     public Iterable<Statement> asStatements()
             throws MetadataRepositoryException {
@@ -138,8 +182,12 @@ public class RdfDescription {
                     URIImpl predicateURI = new URIImpl(entry.getKey().toString());
                     Object object = entry.getValue();
                     String objectString = object.toString();
+                    logger.trace("Generating statement: {}, {}, str({})",
+                            subjectURI, predicateURI, objectString);
                     Value objectValue = getOntology().convertObject(entry.getKey(), entry.getValue());
 
+                    logger.trace("Generated statement: {}, {}, {}",
+                            subjectURI, predicateURI, objectValue);
                     return new StatementImpl(subjectURI, predicateURI, objectValue);
                 } catch (MetadataRepositoryException em) {
                     return null;

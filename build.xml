@@ -64,7 +64,9 @@
             destdir="${build.main.java}"
             deprecation="on"
             debug="true"
-            includeantruntime="false" />
+            includeantruntime="false">
+            <compilerarg value="-Xlint:unchecked"/>
+        </javac>
     </target>
 
     <target name="test.compile">
