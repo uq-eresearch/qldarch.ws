@@ -23,7 +23,6 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -38,7 +37,6 @@ import javax.ws.rs.core.MediaType;
 import static com.google.common.base.Functions.toStringFunction;
 import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.collect.Collections2.transform;
-import static com.google.common.collect.Sets.newHashSet;
 import static javax.ws.rs.core.Response.Status;
 
 @Path("/annotation")
@@ -53,6 +51,8 @@ public class AnnotationResource {
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#assertionDate");
     public static final URI QA_DOCUMENTED_BY =
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#documentedBy");
+    public static final URI QA_EVIDENCE =
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#evidence");
     public static final URI QAC_HAS_ANNOTATION_GRAPH = 
         URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph");
     public static final URI QAC_CATALOG_GRAPH = 
@@ -74,9 +74,11 @@ public class AnnotationResource {
                 "  graph <http://qldarch.net/rdf/2013-09/catalog> { " +
                 "    ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g. " +
                 "  } . " +
+                "  graph <http://qldarch.net/ns/rdf/2012-06/terms#> { " +
+                "    ?t rdfs:subClassOf :Relationship . " +
+                "  } . " +
                 "  graph ?g { " +
                 "    ?s a ?t . " +
-                "    ?t rdfs:subClassOf :Relationship . " +
                 "    ?s :subject <%s> . " +
                 "    ?s :regionStart ?start . " +
                 "    ?s :regionEnd ?end . " +
@@ -181,32 +183,42 @@ public class AnnotationResource {
                 .type(MediaType.TEXT_PLAIN)
                 .entity("No rdf:type provided")
                 .build();
-        } else if (types.size() > 1) {
-            logger.info("Bad request received. Multiple rdf:types provided: {}", rdf);
-            return Response
-                .status(Status.BAD_REQUEST)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Multiple rdf:types provided")
-                .build();
         }
 
-        URI type = types.get(0);
         URI userAnnotationGraph = user.getAnnotationGraph();
 
-        // Generate id
-        URI id = newAnnotationId(userAnnotationGraph, type);
-
-        rdf.setURI(id);
-        rdf.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
-        rdf.replaceProperty(QA_ASSERTION_DATE, new Date());
-        rdf.replaceProperty(QA_DOCUMENTED_BY, rdf.getValues(QA_SUBJECT));
-
-        // Generate and Perform insert query
         try {
+            List<RdfDescription> evidences = rdf.getSubGraphs(QA_EVIDENCE);
+            for (RdfDescription ev : evidences) {
+                List<URI> evTypes = ev.getType();
+                if (evTypes.size() == 0) {
+                    logger.info("Bad request received. No rdf:type provided for evidence: {}", ev);
+                    return Response
+                        .status(Status.BAD_REQUEST)
+                        .type(MediaType.TEXT_PLAIN)
+                        .entity("No rdf:type provided for evidence")
+                        .build();
+                }
+                URI type = types.get(0);
+                URI evId = newAnnotationId(userAnnotationGraph, type);
+                
+                ev.setURI(evId);
+                ev.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
+                ev.replaceProperty(QA_ASSERTION_DATE, new Date());
+
+                performInsert(ev, user);
+            }
+
+            URI type = types.get(0);
+
+            // Generate id
+            URI relId = newAnnotationId(userAnnotationGraph, type);
+            rdf.setURI(relId);
+
+            // Generate and Perform insert query
             performInsert(rdf, user);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insert id:{}, graph:{}, rdf:{})",
-                    id, userAnnotationGraph, rdf, em);
+            logger.warn("Error performing insert graph:{}, rdf:{})", userAnnotationGraph, rdf, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
@@ -217,7 +229,7 @@ public class AnnotationResource {
         String entity = new ObjectMapper().writeValueAsString(rdf);
         logger.trace("Returning successful entity: {}", entity);
         // Return
-        return Response.created(id)
+        return Response.created(rdf.getURI())
             .entity(entity)
             .build();
     }

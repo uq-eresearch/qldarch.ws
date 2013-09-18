@@ -85,13 +85,18 @@ public class RdfDescription {
         logger.info("Received {} => {}::{}", name, value, value.getClass());
         URI nameURI = KnownPrefixes.resolve(name);
         if (value instanceof Map) {
-            properties.put(nameURI, new RdfDescription((Map)value));
-        } if (value instanceof List) {
+            @SuppressWarnings("unchecked")
+            RdfDescription rdfDesc = new RdfDescription((Map)value);
+            properties.put(nameURI, rdfDesc);
+            logger.info("Materializing as {} => {}::{}", nameURI, rdfDesc, rdfDesc.getClass());
+        } else if (value instanceof List) {
             for (Object prop : (List<?>)value) {
                 this.addProperty(name, prop);
+                logger.info("Materializing as {} => {}::{}", nameURI, prop, prop.getClass());
             }
         } else {
             this.properties.put(nameURI, value);
+            logger.info("Materializing as {} => {}::{}", nameURI, value, value.getClass());
         }
     }
 
@@ -118,6 +123,11 @@ public class RdfDescription {
         return properties.get(name);
     }
 
+    public List<RdfDescription> getSubGraphs(URI name) {
+        Collection<Object> col = getValues(name);
+        return ImmutableList.copyOf(filter(transform(col, toGraph), notNull()));
+    }
+
     public void replaceProperty(URI name, Object value) {
         replaceProperty(name, Collections.singleton(value));
     }
@@ -128,7 +138,9 @@ public class RdfDescription {
 
     private static Function<Object,URI> toURI = new Function<Object,URI>() {
         public URI apply(Object o) {
-            if (!(o instanceof String)) {
+            if (o instanceof URI) {
+                return (URI)o;
+            } else if (!(o instanceof String)) {
                 return null;
             } else {
                 try {
@@ -140,6 +152,17 @@ public class RdfDescription {
             }
         }
     };
+
+    private static class ToGraph implements Function<Object,RdfDescription> {
+        public RdfDescription apply(Object o) {
+            if (o instanceof RdfDescription) {
+                return (RdfDescription)o;
+            } else {
+                return null;
+            }
+        }
+    };
+    private static ToGraph toGraph = new ToGraph();
 
     public Iterable<Statement> asStatements()
             throws MetadataRepositoryException {
@@ -159,8 +182,12 @@ public class RdfDescription {
                     URIImpl predicateURI = new URIImpl(entry.getKey().toString());
                     Object object = entry.getValue();
                     String objectString = object.toString();
+                    logger.trace("Generating statement: {}, {}, str({})",
+                            subjectURI, predicateURI, objectString);
                     Value objectValue = getOntology().convertObject(entry.getKey(), entry.getValue());
 
+                    logger.trace("Generated statement: {}, {}, {}",
+                            subjectURI, predicateURI, objectValue);
                     return new StatementImpl(subjectURI, predicateURI, objectValue);
                 } catch (MetadataRepositoryException em) {
                     return null;
