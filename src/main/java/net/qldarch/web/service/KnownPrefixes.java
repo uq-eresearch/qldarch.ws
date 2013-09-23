@@ -77,7 +77,9 @@ public class KnownPrefixes {
             }
         } else {
             try {
-                URI suffix = new URI(matcher.group(2));
+                URI suffix = (prefix.getFragment() == null) ?
+                    new URI(matcher.group(2)) :
+                    new URI("#" + matcher.group(2));
                 return prefix.resolve(suffix);
             } catch (URISyntaxException eu2) {
                 logger.debug("Suffix was not a valid relative URI {}", matcher.group(2), eu2);
@@ -258,6 +260,7 @@ public class KnownPrefixes {
             .put("qldarch", URI.create("http://qldarch.net/ns/rdf/2012-06/terms#"))
             .put("qavocab", URI.create("http://qldarch.net/ns/skos/2013-02/vocab#"))
             .put("qaint", URI.create("http://qldarch.net/ns/rdf/2013-08/internal#"))
+            .put("qaomeka", URI.create("http://qldarch.net/omeka/items/show/"))
             .put("rdf", URI.create("http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
             .put("rdfs", URI.create("http://www.w3.org/2000/01/rdf-schema#"))
             .put("owl", URI.create("http://www.w3.org/2002/07/owl#"))
