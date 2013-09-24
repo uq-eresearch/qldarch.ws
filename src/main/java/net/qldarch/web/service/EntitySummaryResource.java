@@ -1,6 +1,5 @@
 package net.qldarch.web.service;
 
-import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
@@ -48,86 +47,144 @@ public class EntitySummaryResource {
     private QldarchOntology ontology = null;
     private SesameConnectionPool connectionPool = null;
 
-    public static String summaryQuery(Collection<String> types) {
-        StringBuilder builder = new StringBuilder(
-                "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "select ?s ?p ?o " +
-                "from <http://qldarch.net/rdf/user/entities> " +            // User added entities
-                "from <http://qldarch.net/rdf/2012/12/resources#> " +     // Inferred entities
-                "from named <http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "where { " + 
-                "  ?s a ?t." +
-                "  ?s ?p ?o ." +
-                "  GRAPH <http://qldarch.net/ns/rdf/2012-06/terms#> { " +
-                "    ?p :summaryProperty true . " +
-                "  } " +
-                "} BINDINGS ?t { (<");
+    public static String queryByTypes(Collection<URI> types, boolean summary) {
+        if (types.size() < 1) {
+            throw new IllegalArgumentException("Empty type collection passed to queryByTypes()");
+        }
 
-        String query = Joiner.on(">) (<")
+        StringBuilder builder = new StringBuilder(
+            "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " + 
+            "PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> " + 
+            "select distinct ?s ?p ?o where  {" + 
+            "  {" + 
+            "    graph <http://qldarch.net/rdf/2013-09/catalog> {" + 
+            "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g." + 
+            "    } ." + 
+            "  } UNION {" + 
+            "    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) ." + 
+            "  } ." + 
+            "  graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" + 
+            "    ?transType rdfs:subClassOf ?type ." + 
+            "  } ." + 
+            "  graph ?g {" + 
+            "    ?s a ?transType ." + 
+            "    ?s ?p ?o ." + 
+            "  } ." + 
+            "%s" +
+            "} BINDINGS ?type { ( <");
+
+        String summaryRestriction =
+            "  graph <http://qldarch.net/ns/rdf/2012-06/terms#> {" + 
+            "    ?p a :SummaryProperty ." + 
+            "  } ";
+
+        String baseQuery = Joiner.on(">) (<")
             .appendTo(builder, transform(types, toStringFunction()))
             .append(">) }")
             .toString();
 
+        String query = String.format(baseQuery, (summary ? summaryRestriction : ""));
+
         logger.debug("EntityResource performing SPARQL query: {}", query);
-        
+
         return query;
     }
 
     @GET
-    @Produces("application/json")
+    @Produces(MediaType.APPLICATION_JSON)
     @Path("summary/{type}")
-    public String performGet(
-            @PathParam("type") String type,
+    public String summaryGet(
+            @DefaultValue("") @PathParam("type") String type,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
-        logger.debug("Querying type: {}, typelist: {}", type, typelist);
 
-        Set<String> types = newHashSet(type);
-        Iterables.addAll(types, Splitter.on(',').trimResults().omitEmptyStrings().split(typelist));
-
-        logger.debug("Raw types: {}", types);
-
-        return new SparqlToJsonString().performQuery(summaryQuery(types));
+        return findByType(type, typelist, true);
     }
 
-    public static String descriptionQuery(Collection<String> ids) {
-        StringBuilder builder = new StringBuilder(
-                "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "select ?s ?p ?o " +
-                "from <http://qldarch.net/rdf/user/entities> " +             // User added entities
-                "from <http://qldarch.net/rdf/2012/12/resources#> where {" + // Inferred entities
-                "  ?s ?p ?o ." +
-                "} BINDINGS ?s { (<");
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("detail/{type}")
+    public String detailGet(
+            @DefaultValue("") @PathParam("type") String type,
+            @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
-        String query = Joiner.on(">) (<")
+        return findByType(type, typelist, false);
+    }
+
+    public String findByType(String type, String typelist, boolean summary) {
+        logger.debug("Querying summary({}) by type: {}, typelist: {}", summary, type, typelist);
+
+        Set<String> typeStrs = newHashSet(
+                Splitter.on(',').trimResults().omitEmptyStrings().split(typelist));
+        if (!type.isEmpty()) typeStrs.add(type);
+
+        Collection<URI> typeURIs = transform(typeStrs, Functions.toResolvedURI());
+
+        logger.debug("Raw types: {}", typeURIs);
+
+        return new SparqlToJsonString().performQuery(queryByTypes(typeURIs, summary));
+    }
+
+    public static String queryByIds(Collection<URI> ids, boolean summary) {
+        if (ids.size() < 1) {
+            throw new IllegalArgumentException("Empty id collection passed to queryByIds()");
+        }
+
+        StringBuilder builder = new StringBuilder(
+            "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " + 
+            "PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> " + 
+            "select distinct ?s ?p ?o where  {" + 
+            "  {" + 
+            "    graph <http://qldarch.net/rdf/2013-09/catalog> {" + 
+            "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g." + 
+            "    } ." + 
+            "  } UNION {" + 
+            "    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) ." + 
+            "  } ." + 
+            "  graph ?g {" + 
+            "    ?s ?p ?o ." + 
+            "  } ." + 
+            "%s" +
+            "} BINDINGS ?s { ( <");
+
+        String summaryRestriction =
+            "  graph <http://qldarch.net/ns/rdf/2012-06/terms#> {" + 
+            "    ?p a :SummaryProperty ." + 
+            "  } ";
+
+        String baseQuery = Joiner.on(">) (<")
             .appendTo(builder, transform(ids, toStringFunction()))
             .append(">) }")
             .toString();
 
+        String query = String.format(baseQuery, (summary ? summaryRestriction : ""));
+
         logger.debug("EntityResource performing SPARQL query: {}", query);
-        
+
         return query;
     }
 
     @GET
-    @Produces("application/json")
-    @Path("{type}/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("description")
     public String performGet(
-            @PathParam("type") String type,
-            @PathParam("id") String id,
-            @DefaultValue("") @QueryParam("IDLIST") String idlist) {
-        logger.debug("Querying id: {}, idlist: {}", id, idlist);
+            @DefaultValue("") @QueryParam("ID") String id,
+            @DefaultValue("") @QueryParam("IDLIST") String idlist,
+            @DefaultValue("false") @QueryParam("SUMMARY") boolean summary) {
+        logger.debug("Querying summary({}) by id: {}, idlist: {}", summary, id, idlist);
 
-        Set<String> ids = newHashSet(id);
-        Iterables.addAll(ids, Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
+        Set<String> idStrs = newHashSet(
+                Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
+        if (!id.isEmpty()) idStrs.add(id);
 
-        logger.debug("Raw ids: {}", ids);
+        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
 
-        return new SparqlToJsonString().performQuery(descriptionQuery(ids));
+        logger.debug("Raw ids: {}", idURIs);
+
+        return new SparqlToJsonString().performQuery(queryByIds(idURIs, summary));
     }
-
+ 
     @POST
-    @Path("description/")
-    @Produces("text/plain")
+    @Path("description")
     @Consumes(MediaType.APPLICATION_JSON)
     @RequiresPermissions("create:entity")
     public Response addEntity(RdfDescription rdf) {
