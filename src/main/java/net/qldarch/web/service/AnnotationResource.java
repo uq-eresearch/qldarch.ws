@@ -1,7 +1,6 @@
 package net.qldarch.web.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
@@ -34,7 +33,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 
-import static com.google.common.base.Functions.toStringFunction;
 import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.collect.Collections2.transform;
 import static javax.ws.rs.core.Response.Status;
@@ -67,37 +65,37 @@ public class AnnotationResource {
         BigDecimal end = time.add(duration);
 
         String formatStr = 
-           "PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#> " +
-           "PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#> " +
-           "PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>" +
-           "select ?s ?p ?o  where {   " +
-           "    graph <http://qldarch.net/rdf/2013-09/catalog> {" +
-           "        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g. " +
-           "    } . " +
-           "    graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
-           "       ?t rdfs:subClassOf :Relationship ." +
-           "    } . " +
-           "    graph ?g {" +
-           "        ?r a ?t ." +
-           "        ?r :evidence ?e ." +
-           "        ?e :documentedBy <%s> ." +
-           "        ?e :timeFrom ?start ." +
-           "        ?e :timeTo ?end ." +
-           "    } . " +
-           "    {   " +
-           "        graph ?g {" +
-           "            BIND (?r AS ?s) ." +
-           "            ?s ?p ?o ." +
-           "        } ." +
-           "    } UNION {" +
-           "        graph ?g {" +
-           "            ?r :evidence ?s ." +
-           "            ?s ?p ?o ." +
-           "        } ." +
-           "    } ." +
-           "    FILTER ( xsd:decimal(\"%s\") <= ?end &&" +
-           "             xsd:decimal(\"%s\") >= ?start ) . " +
-           "} ";
+            "PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#> " +
+            "PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#> " +
+            "PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> " +
+            "select distinct ?s ?p ?o  where {   " +
+            "    graph <http://qldarch.net/rdf/2013-09/catalog> {" +
+            "        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g. " +
+            "    } . " +
+            "    graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
+            "       ?t rdfs:subClassOf :Relationship ." +
+            "    } . " +
+            "    graph ?g {" +
+            "        ?r a ?t ." +
+            "        ?r :evidence ?e ." +
+            "        ?e :documentedBy <%s> ." +
+            "        ?e :timeFrom ?start ." +
+            "        ?e :timeTo ?end ." +
+            "    } . " +
+            "    {   " +
+            "        graph ?g {" +
+            "            BIND (?r AS ?s) ." +
+            "            ?s ?p ?o ." +
+            "        } ." +
+            "    } UNION {" +
+            "        graph ?g {" +
+            "            ?r :evidence ?s ." +
+            "            ?s ?p ?o ." +
+            "        } ." +
+            "    } ." +
+            "    FILTER ( xsd:decimal(\"%s\") <= ?end &&" +
+            "             xsd:decimal(\"%s\") >= ?start ) . " +
+            "} ";
 
         String query = String.format(formatStr, annotation, time, end);
 
@@ -137,11 +135,11 @@ public class AnnotationResource {
         BigDecimal time = null;
         BigDecimal duration = null;
         try {
-            resource = new URI(resourceStr);
+            resource = KnownPrefixes.resolve(resourceStr);
             time = new BigDecimal(timeStr);
             duration = new BigDecimal(durationStr);
-        } catch (URISyntaxException eu) {
-            logger.info("Malformed URI submitted to annotations request: {}", resourceStr, eu);
+        } catch (MetadataRepositoryException em) {
+            logger.info("Unable to resolve submitted URI: {}", resourceStr, em);
             return Response
                 .status(Status.BAD_REQUEST)
                 .type(MediaType.TEXT_PLAIN)
