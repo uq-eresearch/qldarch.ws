@@ -1,5 +1,7 @@
 package net.qldarch.web.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
@@ -14,11 +16,11 @@ import org.openrdf.repository.RepositoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Collection;
-import java.util.GregorianCalendar;
+import java.util.Date;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -37,10 +39,11 @@ import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
 import static javax.ws.rs.core.Response.Status;
 
+import static net.qldarch.web.service.KnownURIs.*;
+
 @Path("/entity")
 public class EntitySummaryResource {
     public static Logger logger = LoggerFactory.getLogger(EntitySummaryResource.class);
-    public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
 
     public static String USER_ENTITY_GRAPH_FORMAT = "http://qldarch.net/users/%s/entities";
 
@@ -187,12 +190,21 @@ public class EntitySummaryResource {
     @Path("description")
     @Consumes(MediaType.APPLICATION_JSON)
     @RequiresPermissions("create:entity")
-    public Response addEntity(RdfDescription rdf) {
-        // Check User Authz
-        Subject currentUser = SecurityUtils.getSubject();
-        String username = Validators.username((String)currentUser.getPrincipal());
+    public Response addEntity(String json) throws IOException {
+        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
-        URI userEntityGraph = URI.create(String.format(USER_ENTITY_GRAPH_FORMAT, username));
+        // Check User Authz
+        User user = User.currentUser();
+
+        if (user.isAnon()) {
+            return Response
+                .status(Status.FORBIDDEN)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("Anonymous users are not permitted to create annotations")
+                .build();
+        }
+
+        URI userEntityGraph = user.getEntityGraph();
 
         // Check Entity type
         List<URI> types = rdf.getType();
@@ -203,27 +215,51 @@ public class EntitySummaryResource {
                 .type(MediaType.TEXT_PLAIN)
                 .entity("No rdf:type provided")
                 .build();
-        } else if (types.size() > 1) {
-            logger.info("Bad request received. Multiple rdf:types provided: {}", rdf);
-            return Response
-                .status(Status.BAD_REQUEST)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Multiple rdf:types provided")
-                .build();
         }
-
-        URI type = types.get(0);
-
-        // Generate id
-        URI id = newEntityId(userEntityGraph, type);
-        rdf.setURI(id);
-
-        // Generate and Perform insert query
         try {
-            performInsert(rdf, userEntityGraph);
+            List<RdfDescription> evidences = rdf.getSubGraphs(QA_EVIDENCE);
+            if (evidences.isEmpty()) {
+                RdfDescription ev = new RdfDescription();
+                ev.addProperty(RDF_TYPE, QA_EVIDENCE_TYPE);
+                rdf.addProperty(QA_EVIDENCE, ev);
+            }
+            evidences = rdf.getSubGraphs(QA_EVIDENCE);
+            if (evidences.isEmpty()) {
+                logger.error("Failed to add evidence to entity");
+                throw new MetadataRepositoryException("Failed to add evidence to entity");
+            }
+
+            for (RdfDescription ev : evidences) {
+                List<URI> evTypes = ev.getType();
+                if (evTypes.size() == 0) {
+                    logger.info("Bad request received. No rdf:type provided for evidence: {}", ev);
+                    return Response
+                        .status(Status.BAD_REQUEST)
+                        .type(MediaType.TEXT_PLAIN)
+                        .entity("No rdf:type provided for evidence")
+                        .build();
+                }
+                URI evType = evTypes.get(0);
+                URI evId = user.newId(userEntityGraph, evType);
+                
+                ev.setURI(evId);
+                ev.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
+                ev.replaceProperty(QA_ASSERTION_DATE, new Date());
+
+                performInsert(ev, user);
+            }
+
+            URI type = types.get(0);
+            validateRequiredToCreate(rdf, type);
+
+            URI id = user.newId(userEntityGraph, type);
+
+            rdf.setURI(id);
+
+            // Generate and Perform insert query
+            performInsert(rdf, user);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insert id:{}, graph:{}, rdf:{})",
-                    id, userEntityGraph, rdf, em);
+            logger.warn("Error performing insert graph:{}, rdf:{})", userEntityGraph, rdf, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
@@ -231,52 +267,45 @@ public class EntitySummaryResource {
                 .build();
         }
 
+        String entity = new ObjectMapper().writeValueAsString(rdf);
+        logger.trace("Returning successful entity: {}", entity);
+
         // Return
-        return Response.created(id)
-            .entity(rdf)
+        return Response.created(rdf.getURI())
+            .entity(entity)
             .build();
     }
 
-    public static URI QLDARCH_TERMS = URI.create("http://qldarch.net/ns/rdf/2012-06/terms#");
-    public static URI FOAF_NS = URI.create("http://xmlns.com/foaf/0.1/");
+    private void validateRequiredToCreate(RdfDescription rdf, URI type)
+            throws MetadataRepositoryException {
+        QldarchOntology ont = getOntology();
 
-    private URI newEntityId(URI userEntityGraph, URI type) {
-        URI typeFrag = QLDARCH_TERMS.relativize(type);
-        if (typeFrag.equals(type)) {
-            typeFrag = FOAF_NS.relativize(type);
-            if (typeFrag.equals(type)) {
-                return null;
+        Multimap<URI, Object> entity = ont.findByURI(type);
+        Collection<Object> requiredPredicates = entity.get(QA_REQUIRED);
+        for (Object o : requiredPredicates) {
+            if (o instanceof URI) {
+                if (rdf.getValues((URI)o).isEmpty()) {
+                    logger.info("create:entity received missing required property: {}", o);
+                    throw new MetadataRepositoryException("Missing required property " + o);
+                }
+            } else {
+                logger.warn("Required property {} for type {} was not a URI", o, type);
             }
         }
-
-        URI entityBase = userEntityGraph.resolve(typeFrag);
-
-        String id = getNextIdForUser(userEntityGraph);
-
-        return entityBase.resolve(id);
     }
 
-    private static long START_DATE = new GregorianCalendar(2012, 1, 1, 0, 0, 0).getTime().getTime();
-    private static Random random = new Random();
-
-    private synchronized String getNextIdForUser(URI userEntityGraph) {
-        long delta = System.currentTimeMillis() - START_DATE;
-        try {
-            Thread.sleep(1);
-        } catch (InterruptedException ei) {
-            logger.warn("ID delay interrupted for {}", userEntityGraph.toString(), ei);
-        }
-            
-        return Long.toString(delta);
-    }
-
-    private void performInsert(final RdfDescription rdf, final URI userEntityGraph)
+    private void performInsert(final RdfDescription rdf, final User user)
             throws MetadataRepositoryException {
         this.getConnectionPool().performOperation(new RepositoryOperation() {
             public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {
-                URIImpl context = new URIImpl(userEntityGraph.toString());
-                conn.add(rdf.asStatements(), new URIImpl(userEntityGraph.toString()));
+                URIImpl userURI = new URIImpl(user.getUserURI().toString());
+                URIImpl hasEntityGraphURI = new URIImpl(QAC_HAS_ENTITY_GRAPH.toString());
+                URIImpl contextURI = new URIImpl(user.getEntityGraph().toString());
+                URIImpl catalogURI = new URIImpl(QAC_CATALOG_GRAPH.toString());
+
+                conn.add(userURI, hasEntityGraphURI, contextURI, catalogURI);
+                conn.add(rdf.asStatements(), contextURI);
             }
         });
     }

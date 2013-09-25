@@ -109,8 +109,8 @@ public class QldarchOntology {
 
     public QldarchOntology() {}
 
-    public Multimap<URI,Object> findByURI(URI entity) throws MetadataRepositoryException {
-        return this.getEntities().get(entity);
+    public Multimap<URI,Object> findByURI(URI entityTypeURI) throws MetadataRepositoryException {
+        return this.getEntities().get(entityTypeURI);
     }
 
     public List<URI> findByRdfType(URI type) throws MetadataRepositoryException {
@@ -168,6 +168,9 @@ public class QldarchOntology {
         });
     }
 
+    /**
+     * @return A multimap of entities indexed by rdf:type.
+     */
     private synchronized Multimap<URI, URI> getEntitiesByType()
             throws MetadataRepositoryException {
         if (this.entitiesByType == null) {

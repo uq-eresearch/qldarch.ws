@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -87,6 +88,10 @@ public class KnownPrefixes {
                         "Invalid URI in resolution against prefix", eu2);
             }
         }
+    }
+
+    public static Set<URI> getNamespaces() throws MetadataRepositoryException {
+        return KnownPrefixes.instance().getMap().values();
     }
 
     /*

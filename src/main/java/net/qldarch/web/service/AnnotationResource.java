@@ -19,9 +19,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Date;
-import java.util.GregorianCalendar;
 import java.util.List;
-import java.util.Random;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -37,28 +35,15 @@ import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.collect.Collections2.transform;
 import static javax.ws.rs.core.Response.Status;
 
+import static net.qldarch.web.service.KnownURIs.*;
+
 @Path("/annotation")
 public class AnnotationResource {
     public static Logger logger = LoggerFactory.getLogger(AnnotationResource.class);
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
-    public static final URI QA_ASSERTED_BY =
-        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#assertedBy");
-    public static final URI QA_SUBJECT =
-        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#subject");
-    public static final URI QA_ASSERTION_DATE =
-        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#assertionDate");
-    public static final URI QA_DOCUMENTED_BY =
-        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#documentedBy");
-    public static final URI QA_EVIDENCE =
-        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#evidence");
-    public static final URI QAC_HAS_ANNOTATION_GRAPH = 
-        URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph");
-    public static final URI QAC_CATALOG_GRAPH = 
-        URI.create("http://qldarch.net/rdf/2013-09/catalog");
 
     public static String SHARED_ANNOTATION_GRAPH = "http://qldarch.net/rdf/2013-09/annotations";
 
-    private QldarchOntology ontology = null;
     private SesameConnectionPool connectionPool = null;
 
     public static String annotationQuery(URI annotation, BigDecimal time, BigDecimal duration) {
@@ -198,7 +183,7 @@ public class AnnotationResource {
                         .build();
                 }
                 URI evType = evTypes.get(0);
-                URI evId = newAnnotationId(userAnnotationGraph, evType);
+                URI evId = user.newId(userAnnotationGraph, evType);
                 
                 ev.setURI(evId);
                 ev.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
@@ -217,7 +202,7 @@ public class AnnotationResource {
                     .build();
             }
             URI relType = relTypes.get(0);
-            URI relId = newAnnotationId(userAnnotationGraph, relType);
+            URI relId = user.newId(userAnnotationGraph, relType);
 
             rdf.setURI(relId);
 
@@ -232,75 +217,12 @@ public class AnnotationResource {
                 .build();
         }
 
-        String entity = new ObjectMapper().writeValueAsString(rdf);
-        logger.trace("Returning successful entity: {}", entity);
+        String annotation = new ObjectMapper().writeValueAsString(rdf);
+        logger.trace("Returning successful annotation: {}", annotation);
         // Return
         return Response.created(rdf.getURI())
-            .entity(entity)
+            .entity(annotation)
             .build();
-    }
-
-    public static URI[] namespaces = {
-        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#"),
-        URI.create("http://xmlns.com/foaf/0.1/"),
-    };
-
-    private URI newAnnotationId(URI userAnnotationGraph, URI type)
-            throws MetadataRepositoryException {
-        String shorttype = "UnknownTypeNS";
-        for (URI ns : namespaces) {
-            URI typeFrag = ns.relativize(type);
-            if (!typeFrag.equals(type)) {
-                if (typeFrag.getScheme() != null ||
-                        typeFrag.getAuthority() != null ||
-                        typeFrag.getQuery() != null) {
-                    logger.warn("Unexpected resolved shorttype. type:{} ns:{} short:{}",
-                            type, ns, typeFrag);
-                    continue;
-                }
-                String fragment = typeFrag.getFragment();
-                String path = typeFrag.getPath();
-                if ((fragment == null || fragment.isEmpty()) && (path == null || path.isEmpty())) {
-                    logger.info("No fragment or path found in shorttype. type:{} ns:{} short:{}",
-                            type, ns, typeFrag);
-                    continue;
-                } else if (fragment == null || fragment.isEmpty()) {
-                    shorttype = path;
-                } else if (path == null || path.isEmpty()) {
-                    shorttype = fragment;
-                } else {
-                    logger.info("Both fragment or path found in shorttype. " +
-                        "type:{} ns:{} short:{} fragment:'{}' path:'{}'",
-                            type, ns, typeFrag, fragment, path);
-                }
-            }
-        }
-        
-        logger.info("Resolving {} against {}", shorttype, userAnnotationGraph);
-        URI entityBase = userAnnotationGraph.resolve(shorttype);
-
-        String id = getNextIdForUser(userAnnotationGraph);
-
-        try {
-            return new URI(entityBase.getScheme(), entityBase.getSchemeSpecificPart(), id);
-        } catch (URISyntaxException eu) {
-            logger.error("Invalid URI generated by newAnnotationId", eu);
-            throw new MetadataRepositoryException("Invalid URI generated by newAnnotationId", eu);
-        }
-    }
-
-    private static long START_DATE = new GregorianCalendar(2012, 1, 1, 0, 0, 0).getTime().getTime();
-    private static Random random = new Random();
-
-    private synchronized String getNextIdForUser(URI userAnnotationGraph) {
-        long delta = System.currentTimeMillis() - START_DATE;
-        try {
-            Thread.sleep(1);
-        } catch (InterruptedException ei) {
-            logger.warn("ID delay interrupted for {}", userAnnotationGraph.toString(), ei);
-        }
-            
-        return Long.toString(delta);
     }
 
     private void performInsert(final RdfDescription rdf, final User user)
@@ -312,6 +234,7 @@ public class AnnotationResource {
                 URIImpl hasAnnGraphURI = new URIImpl(QAC_HAS_ANNOTATION_GRAPH.toString());
                 URIImpl contextURI = new URIImpl(user.getAnnotationGraph().toString());
                 URIImpl catalogURI = new URIImpl(QAC_CATALOG_GRAPH.toString());
+
                 conn.add(userURI, hasAnnGraphURI, contextURI, catalogURI);
                 conn.add(rdf.asStatements(), contextURI);
             }
@@ -327,16 +250,5 @@ public class AnnotationResource {
             this.connectionPool = SesameConnectionPool.instance();
         }
         return this.connectionPool;
-    }
-
-    public void setOntology(QldarchOntology ontology) {
-        this.ontology = ontology;
-    }
-
-    public synchronized QldarchOntology getOntology() {
-        if (this.ontology == null) {
-            this.ontology = QldarchOntology.instance();
-        }
-        return this.ontology;
     }
 }

@@ -100,6 +100,19 @@ public class RdfDescription {
         }
     }
 
+    @JsonIgnore
+    public void addProperty(URI predicate, Object value) throws MetadataRepositoryException {
+        logger.info("Adding explicitly {} => {}::{}", predicate, value, value.getClass());
+        if (value instanceof List) {
+            for (Object prop : (List<?>)value) {
+                this.addProperty(predicate, prop);
+                logger.info("Expanding to {} => {}::{}", predicate, prop, prop.getClass());
+            }
+        } else {
+            this.properties.put(predicate, value);
+        }
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getProperties() {
         Map<String, Object> result = Maps.newHashMap();
