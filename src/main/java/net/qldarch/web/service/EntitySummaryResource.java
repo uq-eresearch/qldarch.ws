@@ -103,6 +103,13 @@ public class EntitySummaryResource {
         return findByType(type, typelist, true);
     }
 
+    /**
+     * Get detailed records for entity.
+     *
+     * Note: This is supposed to eventually take a filter query-param
+     * that will allow this method to return a sub-graph of the entity/details
+     * for this type.
+     */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("detail/{type}")
