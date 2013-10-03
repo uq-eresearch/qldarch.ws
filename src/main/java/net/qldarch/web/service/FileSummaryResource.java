@@ -22,7 +22,7 @@ import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
 
-@Path("/fileSummary")
+@Path("/file")
 public class FileSummaryResource {
     public static Logger logger = LoggerFactory.getLogger(FileSummaryResource.class);
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
@@ -30,10 +30,19 @@ public class FileSummaryResource {
     public static String formatQuery(Collection<String> ids) {
         StringBuilder builder = new StringBuilder(
                 "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
-                "select ?s ?p ?o from <http://qldarch.net/ns/omeka-export/2013-02-06> where {" +
-                "  ?s a :DigitalFile ." +
-                "  ?s ?p ?o ." +
-                "  } BINDINGS ?s { (<");
+                "select distinct ?s ?p ?o where {" + 
+                "  {" + 
+                "    graph <http://qldarch.net/rdf/2013-09/catalog> {" + 
+                "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasFileGraph> ?g." + 
+                "    } ." + 
+                "  } UNION {" + 
+                "    BIND ( <http://qldarch.net/ns/omeka-export/2013-02-06> AS ?g ) ." + 
+                "  } ." + 
+                "  graph ?g {" +
+                "    ?s a :DigitalFile ." +
+                "    ?s ?p ?o ." +
+                "  } . " +
+                "} BINDINGS ?s { (<");
 
         String query = Joiner.on(">) (<").appendTo(builder, transform(ids, toStringFunction())).append(">) }").toString();
         logger.debug("FileSummaryResource performing SPARQL query: {}", query);
@@ -42,6 +51,7 @@ public class FileSummaryResource {
     }
 
     @GET
+    @Path("summary")
     @Produces("application/json")
     public String performGet(
             @QueryParam("PREFIX") String prefix,
