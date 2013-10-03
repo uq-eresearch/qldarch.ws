@@ -24,6 +24,8 @@ public interface KnownURIs {
         URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph");
     public static final URI QAC_HAS_ENTITY_GRAPH = 
         URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph");
+    public static final URI QAC_HAS_EXPRESSION_GRAPH = 
+        URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasExpressionGraph");
     public static final URI QAC_CATALOG_GRAPH = 
         URI.create("http://qldarch.net/rdf/2013-09/catalog");
 }
