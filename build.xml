@@ -98,13 +98,16 @@
         <war destfile="${dist}/HelloWorld-${version}-min.war" webxml="${src.war.conf}/WEB-INF/web.xml">
             <!--            <metainf file="${src.war.conf}/META-INF/context.xml"/> -->
             <classes dir="${build.main.java}"/>
-            <lib dir="${lib}"/>
+            <lib dir="${lib}">
+                <exclude name="compile/**.jar"/>
+                <exclude name="test/**.jar"/>
+            </lib>
             <classes dir="${src.main.resources}"/>
         </war>
         <move file="${dist}/HelloWorld-${version}-min.war" tofile="${dist}/ws.war" />
     </target>
 
     <target name="deploy" depends="dist">
-        <copy file="${dist}/ws.war" tofile="${tomcat.install.path}/webapps/${tomcat.deploy.path}.war" />
+        <copy file="${dist}/ws.war" tofile="${tomcat.install.path}/webapps/ws.war" />
     </target>
 </project>

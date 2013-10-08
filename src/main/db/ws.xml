@@ -5,6 +5,15 @@
 <Context debug="0">
     <Resource name="jdbc/UserDB" auth="Container" type="javax.sql.DataSource"
         maxActive="50" maxIdle="10" maxWait="10000"
-        username="auth" password="tmppassword" driveClassName="com.mysql.jdbc.Driver"
-        url="jdbc:mysql://localhost/userdb"/>
+        username="auth" password="tmppassword" driverClassName="com.mysql.jdbc.Driver"
+        url="jdbc:mysql://localhost:3306/userdb?autoReconnect=true"/>
+
+    <Parameter name="net.qldarch.context.archivedir" value="/var/lib/qldarch/archive" override="false"/>
+    <!--
+    <env-entry>
+        <env-entry-name>archive-dir</env-entry-name>
+        <env-entry-type>java.lang.String</env-entry-type>
+        <env-entry-value>/var/lib/qldarch/archive</env-entry-value>
+    </env-entry>
+    -->
 </Context>

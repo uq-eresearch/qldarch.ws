@@ -17,11 +17,13 @@ public class User {
     public static String USER_ANNOTATION_GRAPH_FORMAT = "http://qldarch.net/users/%s/annotations";
     public static String USER_ENTITY_GRAPH_FORMAT = "http://qldarch.net/users/%s/entities";
     public static String USER_EXPRESSION_GRAPH_FORMAT = "http://qldarch.net/users/%s/expressions";
+    public static String USER_FILE_GRAPH_FORMAT = "http://qldarch.net/users/%s/files";
     public static String USER_URI_FORMAT = "http://qldarch.net/users/%s";
 
     private String username;
 
-    private User(String username) {
+    // FIXME: Made package scope to allow testing.
+    User(String username) {
         this.username = Validators.username(username);
     }
 
@@ -34,6 +36,10 @@ public class User {
 
     public boolean isAnon() {
         return username == null || username.isEmpty();
+    }
+
+    public String getUsername() {
+        return username;
     }
 
     public URI getUserURI() {
@@ -54,6 +60,10 @@ public class User {
 
     public URI getExpressionGraph() {
         return URI.create(String.format(USER_EXPRESSION_GRAPH_FORMAT, username));
+    }
+
+    public URI getFileGraph() {
+        return URI.create(String.format(USER_FILE_GRAPH_FORMAT, username));
     }
 
     public URI newId(URI graphURI, URI type)

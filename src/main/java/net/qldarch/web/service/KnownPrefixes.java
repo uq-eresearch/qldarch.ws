@@ -1,5 +1,7 @@
 package net.qldarch.web.service;
 
+import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableBiMap;
@@ -88,6 +90,19 @@ public class KnownPrefixes {
                         "Invalid URI in resolution against prefix", eu2);
             }
         }
+    }
+
+    public static Function<String,Optional<URI>> resolver() {
+        return new Function<String,Optional<URI>>() {
+            public Optional<URI> apply(String s) {
+                try {
+                    return Optional.of(KnownPrefixes.resolve(s));
+                } catch (MetadataRepositoryException em) {
+                    logger.debug("Unable to resolve {}, returning null from resolver", s);
+                    return Optional.absent();
+                }
+            }
+        };
     }
 
     public static Set<URI> getNamespaces() throws MetadataRepositoryException {
