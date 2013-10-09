@@ -1,5 +1,6 @@
 package net.qldarch.web.service;
 
+import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -17,8 +18,10 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Set;
 import javax.servlet.ServletContext;
 import javax.ws.rs.Consumes;
@@ -48,6 +51,7 @@ public class FileSummaryResource {
 
     private ServletContext context;
     private File archiveDir;
+    private RdfDataStoreDao rdfDao;
 
     public static String formatQuery(Collection<String> ids) {
         StringBuilder builder = new StringBuilder(
@@ -173,9 +177,10 @@ public class FileSummaryResource {
     }
 
     @GET
-    @Path("user/{id}")
+    @Path("user")
     @Produces("application/json")
-    public Response performGet(@DefaultValue("") @PathParam("id") String fileId) {
+    public Response performGet(@DefaultValue("") @QueryParam("ID") String fileId) {
+        /*
         User user = User.currentUser();
         if (user.isAnon()) {
             return Response
@@ -183,6 +188,8 @@ public class FileSummaryResource {
                 .entity("{}")
                 .build();
         }
+*/
+        User user = new User("admin");
 
         logger.debug("Querying user files : ID: {}", fileId);
 
@@ -200,7 +207,8 @@ public class FileSummaryResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response performPost(
             @FormDataParam("file") InputStream file,
-            @FormDataParam("file") FormDataContentDisposition fileDis) throws IOException {
+            @FormDataParam("file") FormDataContentDisposition fileDis)
+                throws IOException, MetadataRepositoryException {
 
         /*
         User user = User.currentUser();
@@ -211,10 +219,11 @@ public class FileSummaryResource {
                 .build();
         }
 
-        URI userFileGraph = user.getFileGraph();
 */
         // Kludge so I can use curl to test.
-        User user = new User("admin");
+        User user = new User("amuys");
+
+        URI userFileGraph = user.getFileGraph();
 
         File userFileDir = new File(this.archiveDir, user.getUsername());
         File userTmpDir = new File(userFileDir, "tmp");
@@ -231,6 +240,11 @@ public class FileSummaryResource {
                     user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
         File destFile = new File(userFileDir, String.format("%s-%d-%s.%s",
                     user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+        File metaFile = new File(userFileDir, String.format("%s-%d-%s.%s.json",
+                    user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+
+        // Yes, this should be a URL, but Java doesn't permit conversion from relative URI to URL!
+        String locationURI = destFile.toString().substring(this.archiveDir.toString().length() + 1);
 
         Files.copy(file, tmpFile.toPath());
 
@@ -243,6 +257,8 @@ public class FileSummaryResource {
         logger.info("File parameters {}", fileDis.getParameters());
         logger.info("Tmpfile size: {}", Files.size(tmpFile.toPath()));
         logger.info("destFile: {}", destFile);
+        logger.info("metaFile: {}", metaFile);
+        logger.info("locationURI: {}", locationURI);
 
         String mimetype = new Tika().detect(tmpFile);
 
@@ -250,17 +266,46 @@ public class FileSummaryResource {
 
         Files.move(tmpFile.toPath(), destFile.toPath());
 
-        /*
         RdfDescription fileDesc = new RdfDescription();
         fileDesc.addProperty(RDF_TYPE, QA_DIGITAL_FILE);
         fileDesc.addProperty(QA_UPLOADED_BY, user.getUserURI());
         fileDesc.addProperty(QA_DATE_UPLOADED, new Date());
         fileDesc.addProperty(QA_SOURCE_FILENAME, filename);
-        fileDesc.addProperty(QA_HAS_FILE_SIZE, Files.size(tmpFile.toPath());
+        fileDesc.addProperty(QA_HAS_FILE_SIZE, Files.size(destFile.toPath()));
         fileDesc.addProperty(QA_BASIC_MIME_TYPE, mimetype);
-        fileDesc.addProperty(QA_SYSTEM_LOCATION, destFile.toString());
-        */
+        fileDesc.addProperty(QA_MANAGED_FILE, true);
+        fileDesc.addProperty(QA_SYSTEM_LOCATION, locationURI.toString());
 
-        return Response.ok().entity("{}").build();
+        String entity = null;
+        try {
+            URI id = user.newId(userFileGraph, QA_DIGITAL_FILE);
+            fileDesc.setURI(id);
+            this.getRdfDao().performInsert(fileDesc, user, userFileGraph, QAC_HAS_FILE_GRAPH);
+        } catch (MetadataRepositoryException em) {
+            logger.warn("Error performing insert graph:{}, rdf:{})", userFileGraph, fileDesc, em);
+            return Response
+                .status(Status.INTERNAL_SERVER_ERROR)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("Error performing insert")
+                .build();
+        } finally {
+            entity = new ObjectMapper().writeValueAsString(fileDesc);
+            Files.write(metaFile.toPath(), entity.getBytes(Charset.forName("UTF-8")));
+        }
+
+        logger.trace("Returning successful entity: {}", entity);
+
+        return Response.ok().entity(fileDesc).build();
+    }
+
+    public void setRdfDao(RdfDataStoreDao rdfDao) {
+        this.rdfDao = rdfDao;
+    }
+
+    public RdfDataStoreDao getRdfDao() {
+        if (this.rdfDao == null) {
+            this.rdfDao = new RdfDataStoreDao();
+        }
+        return this.rdfDao;
     }
 }

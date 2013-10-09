@@ -1,6 +1,6 @@
 package net.qldarch.web.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -8,9 +8,6 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.openrdf.model.impl.URIImpl;
-import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,8 +59,7 @@ public class ReferenceSummaryResource {
 
     public static String SHARED_REFERENCE_GRAPH = "http://qldarch.net/rdf/2013-09/references";
 
-    private QldarchOntology ontology = null;
-    private SesameConnectionPool connectionPool = null;
+    private RdfDataStoreDao rdfDao;
 
     public static String referenceQuery(URI reference, BigDecimal time, BigDecimal duration) {
         BigDecimal end = time.add(duration);
@@ -159,7 +155,7 @@ public class ReferenceSummaryResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @RequiresPermissions("create:annotation")
-    public Response addReference(String json) throws IOException {
+    public Response addReference(String json) throws IOException, MetadataRepositoryException {
         RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
         // Check User Authz
@@ -195,7 +191,7 @@ public class ReferenceSummaryResource {
         URI userReferenceGraph = user.getReferenceGraph();
 
         // Generate id
-        URI id = newReferenceId(userReferenceGraph, type);
+        URI id = user.newId(userReferenceGraph, type);
 
         rdf.setURI(id);
         rdf.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
@@ -204,7 +200,7 @@ public class ReferenceSummaryResource {
 
         // Generate and Perform insert query
         try {
-            performInsert(rdf, user);
+            this.getRdfDao().performInsert(rdf, user, QAC_HAS_REFERENCE_GRAPH, userReferenceGraph);
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insert id:{}, graph:{}, rdf:{})",
                     id, userReferenceGraph, rdf, em);
@@ -223,73 +219,14 @@ public class ReferenceSummaryResource {
             .build();
     }
 
-    public static URI QLDARCH_TERMS = URI.create("http://qldarch.net/ns/rdf/2012-06/terms#");
-    public static URI FOAF_NS = URI.create("http://xmlns.com/foaf/0.1/");
+    public void setRdfDao(RdfDataStoreDao rdfDao) {
+        this.rdfDao = rdfDao;
+    }
 
-    private URI newReferenceId(URI userReferenceGraph, URI type) {
-        URI typeFrag = QLDARCH_TERMS.relativize(type);
-        if (typeFrag.equals(type)) {
-            typeFrag = FOAF_NS.relativize(type);
-            if (typeFrag.equals(type)) {
-                return null;
-            }
+    public RdfDataStoreDao getRdfDao() {
+        if (this.rdfDao == null) {
+            this.rdfDao = new RdfDataStoreDao();
         }
-
-        URI entityBase = userReferenceGraph.resolve(typeFrag);
-
-        String id = getNextIdForUser(userReferenceGraph);
-
-        return entityBase.resolve(id);
-    }
-
-    private static long START_DATE = new GregorianCalendar(2012, 1, 1, 0, 0, 0).getTime().getTime();
-    private static Random random = new Random();
-
-    private synchronized String getNextIdForUser(URI userReferenceGraph) {
-        long delta = System.currentTimeMillis() - START_DATE;
-        try {
-            Thread.sleep(1);
-        } catch (InterruptedException ei) {
-            logger.warn("ID delay interrupted for {}", userReferenceGraph.toString(), ei);
-        }
-            
-        return Long.toString(delta);
-    }
-
-    private void performInsert(final RdfDescription rdf, final User user)
-            throws MetadataRepositoryException {
-        this.getConnectionPool().performOperation(new RepositoryOperation() {
-            public void perform(RepositoryConnection conn)
-                    throws RepositoryException, MetadataRepositoryException {
-                URIImpl userURI = new URIImpl(user.getUserURI().toString());
-                URIImpl hasRefGraphURI = new URIImpl(QAC_HAS_REFERENCE_GRAPH.toString());
-                URIImpl contextURI = new URIImpl(user.getReferenceGraph().toString());
-                URIImpl catalogURI = new URIImpl(QAC_CATALOG_GRAPH.toString());
-                conn.add(userURI, hasRefGraphURI, contextURI, catalogURI);
-                conn.add(rdf.asStatements(), contextURI);
-            }
-        });
-    }
-
-    public void setConnectionPool(SesameConnectionPool connectionPool) {
-        this.connectionPool = connectionPool;
-    }
-
-    public synchronized SesameConnectionPool getConnectionPool() {
-        if (this.connectionPool == null) {
-            this.connectionPool = SesameConnectionPool.instance();
-        }
-        return this.connectionPool;
-    }
-
-    public void setOntology(QldarchOntology ontology) {
-        this.ontology = ontology;
-    }
-
-    public synchronized QldarchOntology getOntology() {
-        if (this.ontology == null) {
-            this.ontology = QldarchOntology.instance();
-        }
-        return this.ontology;
+        return this.rdfDao;
     }
 }

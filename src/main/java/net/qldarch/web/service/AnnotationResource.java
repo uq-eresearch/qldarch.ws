@@ -1,15 +1,12 @@
 package net.qldarch.web.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.openrdf.model.impl.URIImpl;
-import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +41,7 @@ public class AnnotationResource {
 
     public static String SHARED_ANNOTATION_GRAPH = "http://qldarch.net/rdf/2013-09/annotations";
 
-    private SesameConnectionPool connectionPool = null;
+    private RdfDataStoreDao rdfDao;
 
     public static String annotationQuery(URI annotation, BigDecimal time, BigDecimal duration) {
         BigDecimal end = time.add(duration);
@@ -189,7 +186,8 @@ public class AnnotationResource {
                 ev.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
                 ev.replaceProperty(QA_ASSERTION_DATE, new Date());
 
-                performInsert(ev, user);
+                this.getRdfDao().performInsert(ev, user, QAC_HAS_ANNOTATION_GRAPH,
+                        userAnnotationGraph);
             }
 
             List<URI> relTypes = rdf.getType();
@@ -207,7 +205,8 @@ public class AnnotationResource {
             rdf.setURI(relId);
 
             // Generate and Perform insert query
-            performInsert(rdf, user);
+            this.getRdfDao().performInsert(rdf, user, QAC_HAS_ANNOTATION_GRAPH,
+                    userAnnotationGraph);
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insert graph:{}, rdf:{})", userAnnotationGraph, rdf, em);
             return Response
@@ -225,30 +224,14 @@ public class AnnotationResource {
             .build();
     }
 
-    private void performInsert(final RdfDescription rdf, final User user)
-            throws MetadataRepositoryException {
-        this.getConnectionPool().performOperation(new RepositoryOperation() {
-            public void perform(RepositoryConnection conn)
-                    throws RepositoryException, MetadataRepositoryException {
-                URIImpl userURI = new URIImpl(user.getUserURI().toString());
-                URIImpl hasAnnGraphURI = new URIImpl(QAC_HAS_ANNOTATION_GRAPH.toString());
-                URIImpl contextURI = new URIImpl(user.getAnnotationGraph().toString());
-                URIImpl catalogURI = new URIImpl(QAC_CATALOG_GRAPH.toString());
-
-                conn.add(userURI, hasAnnGraphURI, contextURI, catalogURI);
-                conn.add(rdf.asStatements(), contextURI);
-            }
-        });
+    public void setRdfDao(RdfDataStoreDao rdfDao) {
+        this.rdfDao = rdfDao;
     }
 
-    public void setConnectionPool(SesameConnectionPool connectionPool) {
-        this.connectionPool = connectionPool;
-    }
-
-    public synchronized SesameConnectionPool getConnectionPool() {
-        if (this.connectionPool == null) {
-            this.connectionPool = SesameConnectionPool.instance();
+    public RdfDataStoreDao getRdfDao() {
+        if (this.rdfDao == null) {
+            this.rdfDao = new RdfDataStoreDao();
         }
-        return this.connectionPool;
+        return this.rdfDao;
     }
 }

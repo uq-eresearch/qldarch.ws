@@ -1,6 +1,6 @@
 package net.qldarch.web.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -10,9 +10,6 @@ import com.google.common.collect.Multimap;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.apache.shiro.subject.Subject;
-import org.openrdf.model.impl.URIImpl;
-import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,8 +44,7 @@ public class EntitySummaryResource {
 
     public static String USER_ENTITY_GRAPH_FORMAT = "http://qldarch.net/users/%s/entities";
 
-    private QldarchOntology ontology = null;
-    private SesameConnectionPool connectionPool = null;
+    private RdfDataStoreDao rdfDao;
 
     public static String queryByTypes(Collection<URI> types, boolean summary) {
         if (types.size() < 1) {
@@ -253,7 +249,7 @@ public class EntitySummaryResource {
                 ev.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
                 ev.replaceProperty(QA_ASSERTION_DATE, new Date());
 
-                performInsert(ev, user);
+                this.getRdfDao().performInsert(ev, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
             }
 
             URI type = types.get(0);
@@ -264,7 +260,7 @@ public class EntitySummaryResource {
             rdf.setURI(id);
 
             // Generate and Perform insert query
-            performInsert(rdf, user);
+            this.getRdfDao().performInsert(rdf, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insert graph:{}, rdf:{})", userEntityGraph, rdf, em);
             return Response
@@ -285,7 +281,7 @@ public class EntitySummaryResource {
 
     private void validateRequiredToCreate(RdfDescription rdf, URI type)
             throws MetadataRepositoryException {
-        QldarchOntology ont = getOntology();
+        QldarchOntology ont = this.getRdfDao().getOntology();
 
         Multimap<URI, Object> entity = ont.findByURI(type);
         Collection<Object> requiredPredicates = entity.get(QA_REQUIRED);
@@ -301,41 +297,14 @@ public class EntitySummaryResource {
         }
     }
 
-    private void performInsert(final RdfDescription rdf, final User user)
-            throws MetadataRepositoryException {
-        this.getConnectionPool().performOperation(new RepositoryOperation() {
-            public void perform(RepositoryConnection conn)
-                    throws RepositoryException, MetadataRepositoryException {
-                URIImpl userURI = new URIImpl(user.getUserURI().toString());
-                URIImpl hasEntityGraphURI = new URIImpl(QAC_HAS_ENTITY_GRAPH.toString());
-                URIImpl contextURI = new URIImpl(user.getEntityGraph().toString());
-                URIImpl catalogURI = new URIImpl(QAC_CATALOG_GRAPH.toString());
-
-                conn.add(userURI, hasEntityGraphURI, contextURI, catalogURI);
-                conn.add(rdf.asStatements(), contextURI);
-            }
-        });
+    public void setRdfDao(RdfDataStoreDao rdfDao) {
+        this.rdfDao = rdfDao;
     }
 
-    public void setConnectionPool(SesameConnectionPool connectionPool) {
-        this.connectionPool = connectionPool;
-    }
-
-    public synchronized SesameConnectionPool getConnectionPool() {
-        if (this.connectionPool == null) {
-            this.connectionPool = SesameConnectionPool.instance();
+    public RdfDataStoreDao getRdfDao() {
+        if (this.rdfDao == null) {
+            this.rdfDao = new RdfDataStoreDao();
         }
-        return this.connectionPool;
-    }
-
-    public void setOntology(QldarchOntology ontology) {
-        this.ontology = ontology;
-    }
-
-    public synchronized QldarchOntology getOntology() {
-        if (this.ontology == null) {
-            this.ontology = QldarchOntology.instance();
-        }
-        return this.ontology;
+        return this.rdfDao;
     }
 }

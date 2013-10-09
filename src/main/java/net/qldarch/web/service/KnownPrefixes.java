@@ -96,7 +96,12 @@ public class KnownPrefixes {
         return new Function<String,Optional<URI>>() {
             public Optional<URI> apply(String s) {
                 try {
-                    return Optional.of(KnownPrefixes.resolve(s));
+                    logger.trace("Resolving string: {}", s);
+                    if (s != null && !s.isEmpty()) {
+                        return Optional.of(KnownPrefixes.resolve(s));
+                    } else {
+                        return Optional.absent();
+                    }
                 } catch (MetadataRepositoryException em) {
                     logger.debug("Unable to resolve {}, returning null from resolver", s);
                     return Optional.absent();
