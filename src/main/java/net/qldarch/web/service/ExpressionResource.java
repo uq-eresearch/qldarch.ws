@@ -194,7 +194,7 @@ public class ExpressionResource {
     @POST
     @Path("description")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:entity")
+    @RequiresPermissions("create:expression")
     public Response addExpression(String json) throws IOException {
         RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 

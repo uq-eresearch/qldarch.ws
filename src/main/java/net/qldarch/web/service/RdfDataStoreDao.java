@@ -12,8 +12,7 @@ public class RdfDataStoreDao {
     private SesameConnectionPool connectionPool;
     private QldarchOntology ontology;
 
-    public void performInsert(final RdfDescription rdf, final User user, final URI graph,
-            final URI hasGraphPredicate) throws MetadataRepositoryException {
+    public void performInsert(final RdfDescription rdf, final User user, final URI hasGraphPredicate, final URI graph) throws MetadataRepositoryException {
         this.getConnectionPool().performOperation(new RepositoryOperation() {
             public void perform(RepositoryConnection conn)
                     throws RepositoryException, MetadataRepositoryException {

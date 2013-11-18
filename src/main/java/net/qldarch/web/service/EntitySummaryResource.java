@@ -46,7 +46,8 @@ public class EntitySummaryResource {
 
     private RdfDataStoreDao rdfDao;
 
-    public static String queryByTypes(Collection<URI> types, boolean summary) {
+    public static String queryByTypes(Collection<URI> types,
+            boolean includeSubClass, boolean includeSuperClass, boolean summary) {
         if (types.size() < 1) {
             throw new IllegalArgumentException("Empty type collection passed to queryByTypes()");
         }
@@ -62,9 +63,11 @@ public class EntitySummaryResource {
             "  } UNION {" + 
             "    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) ." + 
             "  } ." + 
-            "  graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" + 
-            "    ?transType rdfs:subClassOf ?type ." + 
-            "  } ." + 
+            "  { " +
+            "%s" +
+            "%s" +
+            "    BIND ( ?type AS ?transType ) ." +
+            "  } ." +
             "  graph ?g {" + 
             "    ?s a ?transType ." + 
             "    ?s ?p ?o ." + 
@@ -77,12 +80,27 @@ public class EntitySummaryResource {
             "    ?p a :SummaryProperty ." + 
             "  } ";
 
+        String subClassClause = 
+            "     graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
+            "       ?transType rdfs:subClassOf ?type ." +
+            "     } ." +
+            "   } UNION {";
+
+        String superClassClause =
+            "     graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
+            "       ?type rdfs:subClassOf ?transType ." +
+            "     } ." +
+            "   } UNION {";
+
         String baseQuery = Joiner.on(">) (<")
             .appendTo(builder, transform(types, toStringFunction()))
             .append(">) }")
             .toString();
 
-        String query = String.format(baseQuery, (summary ? summaryRestriction : ""));
+        String query = String.format(baseQuery,
+                (includeSubClass ? subClassClause : ""),
+                (includeSuperClass ? superClassClause : ""),
+                (summary ? summaryRestriction : ""));
 
         logger.debug("EntityResource performing SPARQL query: {}", query);
 
@@ -94,6 +112,8 @@ public class EntitySummaryResource {
     @Path("summary/{type}")
     public String summaryGet(
             @DefaultValue("") @PathParam("type") String type,
+            @DefaultValue("false") @QueryParam("INCSUBCLASS") boolean includeSubClass,
+            @DefaultValue("false") @QueryParam("INCSUPERCLASS") boolean includeSuperClass,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
         return findByType(type, typelist, true);
@@ -111,12 +131,15 @@ public class EntitySummaryResource {
     @Path("detail/{type}")
     public String detailGet(
             @DefaultValue("") @PathParam("type") String type,
+            @DefaultValue("false") @QueryParam("INCSUBCLASS") boolean includeSubClass,
+            @DefaultValue("false") @QueryParam("INCSUPERCLASS") boolean includeSuperClass,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
         return findByType(type, typelist, false);
     }
 
-    public String findByType(String type, String typelist, boolean summary) {
+    public String findByType(String type, String typelist,
+            boolean includeSubClass, boolean includeSuperClass, boolean summary) {
         logger.debug("Querying summary({}) by type: {}, typelist: {}", summary, type, typelist);
 
         Set<String> typeStrs = newHashSet(
@@ -127,7 +150,8 @@ public class EntitySummaryResource {
 
         logger.debug("Raw types: {}", typeURIs);
 
-        return new SparqlToJsonString().performQuery(queryByTypes(typeURIs, summary));
+        return new SparqlToJsonString().performQuery(
+                queryByTypes(typeURIs, includeSubClass, includeSuperClass, summary));
     }
 
     public static String queryByIds(Collection<URI> ids, boolean summary) {

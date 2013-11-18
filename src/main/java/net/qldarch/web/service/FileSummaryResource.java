@@ -280,7 +280,7 @@ public class FileSummaryResource {
         try {
             URI id = user.newId(userFileGraph, QA_DIGITAL_FILE);
             fileDesc.setURI(id);
-            this.getRdfDao().performInsert(fileDesc, user, userFileGraph, QAC_HAS_FILE_GRAPH);
+            this.getRdfDao().performInsert(fileDesc, user, QAC_HAS_FILE_GRAPH, userFileGraph);
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insert graph:{}, rdf:{})", userFileGraph, fileDesc, em);
             return Response
