@@ -116,7 +116,7 @@ public class EntitySummaryResource {
             @DefaultValue("false") @QueryParam("INCSUPERCLASS") boolean includeSuperClass,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
-        return findByType(type, typelist, true);
+        return findByType(type, typelist, includeSubClass, includeSuperClass, true);
     }
 
     /**
@@ -135,7 +135,7 @@ public class EntitySummaryResource {
             @DefaultValue("false") @QueryParam("INCSUPERCLASS") boolean includeSuperClass,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
-        return findByType(type, typelist, false);
+        return findByType(type, typelist, includeSubClass, includeSuperClass, false);
     }
 
     public String findByType(String type, String typelist,

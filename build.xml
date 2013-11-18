@@ -104,7 +104,7 @@
             </lib>
             <classes dir="${src.main.resources}"/>
         </war>
-        <move file="${dist}/HelloWorld-${version}-min.war" tofile="${dist}/ws.war" />
+        <copy file="${dist}/HelloWorld-${version}-min.war" tofile="${dist}/ws.war" />
     </target>
 
     <target name="deploy" depends="dist">
