@@ -67,7 +67,7 @@ public class AnnotationResource {
             "    {   " +
             "        graph ?g {" +
             "            BIND (?r AS ?s) ." +
-            "            ?r ?p ?o ." +
+            "            ?s ?p ?o ." +
             "        } ." +
             "    } UNION {" +
             "        graph ?g {" +
