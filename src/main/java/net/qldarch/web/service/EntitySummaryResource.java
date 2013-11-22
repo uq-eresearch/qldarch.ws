@@ -46,7 +46,7 @@ public class EntitySummaryResource {
 
     private RdfDataStoreDao rdfDao;
 
-    public static String queryByTypes(Collection<URI> types,
+    public static String queryByTypes(Collection<URI> types, long since,
             boolean includeSubClass, boolean includeSuperClass, boolean summary) {
         if (types.size() < 1) {
             throw new IllegalArgumentException("Empty type collection passed to queryByTypes()");
@@ -71,6 +71,7 @@ public class EntitySummaryResource {
             "  graph ?g {" + 
             "    ?s a ?transType ." + 
             "    ?s ?p ?o ." + 
+            "    OPTIONAL { ?s :evidence ?e . ?e :assertionDate ?date . } .
             "  } ." + 
             "%s" +
             "} BINDINGS ?type { ( <");
@@ -97,6 +98,8 @@ public class EntitySummaryResource {
             .append(">) }")
             .toString();
 
+        String filteredQuery = baseQuery.append("FILTER ( ISBOUND(?date) && ?date >= since )");
+
         String query = String.format(baseQuery,
                 (includeSubClass ? subClassClause : ""),
                 (includeSuperClass ? superClassClause : ""),
@@ -114,9 +117,10 @@ public class EntitySummaryResource {
             @DefaultValue("") @PathParam("type") String type,
             @DefaultValue("false") @QueryParam("INCSUBCLASS") boolean includeSubClass,
             @DefaultValue("false") @QueryParam("INCSUPERCLASS") boolean includeSuperClass,
+            @DefaultValue("0") @QueryParam("since") long since,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
-        return findByType(type, typelist, includeSubClass, includeSuperClass, true);
+        return findByType(type, typelist, since, includeSubClass, includeSuperClass, true);
     }
 
     /**
@@ -133,14 +137,17 @@ public class EntitySummaryResource {
             @DefaultValue("") @PathParam("type") String type,
             @DefaultValue("false") @QueryParam("INCSUBCLASS") boolean includeSubClass,
             @DefaultValue("false") @QueryParam("INCSUPERCLASS") boolean includeSuperClass,
+            @DefaultValue("0") @QueryParam("since") long since,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
-        return findByType(type, typelist, includeSubClass, includeSuperClass, false);
+        return findByType(type, typelist, since, includeSubClass, includeSuperClass, false);
     }
 
-    public String findByType(String type, String typelist,
+    public String findByType(String type, String typelist, long since,
             boolean includeSubClass, boolean includeSuperClass, boolean summary) {
         logger.debug("Querying summary({}) by type: {}, typelist: {}", summary, type, typelist);
+
+        if (since < 0) since = 0;  // Sanitise since
 
         Set<String> typeStrs = newHashSet(
                 Splitter.on(',').trimResults().omitEmptyStrings().split(typelist));
@@ -151,7 +158,7 @@ public class EntitySummaryResource {
         logger.debug("Raw types: {}", typeURIs);
 
         return new SparqlToJsonString().performQuery(
-                queryByTypes(typeURIs, includeSubClass, includeSuperClass, summary));
+                queryByTypes(typeURIs, since, includeSubClass, includeSuperClass, summary));
     }
 
     public static String queryByIds(Collection<URI> ids, boolean summary) {
