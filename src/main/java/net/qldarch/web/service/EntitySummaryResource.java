@@ -71,7 +71,7 @@ public class EntitySummaryResource {
             "  graph ?g {" + 
             "    ?s a ?transType ." + 
             "    ?s ?p ?o ." + 
-            "    OPTIONAL { ?s :evidence ?e . ?e :assertionDate ?date . } .
+//            "    OPTIONAL { ?s :evidence ?e . ?e :assertionDate ?date . } .
             "  } ." + 
             "%s" +
             "} BINDINGS ?type { ( <");
@@ -98,7 +98,7 @@ public class EntitySummaryResource {
             .append(">) }")
             .toString();
 
-        String filteredQuery = baseQuery.append("FILTER ( ISBOUND(?date) && ?date >= since )");
+ //       String filteredQuery = baseQuery.append("FILTER ( ISBOUND(?date) && ?date >= since )");
 
         String query = String.format(baseQuery,
                 (includeSubClass ? subClassClause : ""),
