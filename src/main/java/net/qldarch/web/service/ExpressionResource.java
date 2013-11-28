@@ -69,6 +69,8 @@ public class ExpressionResource {
             "  } ." + 
             "  graph ?g {" + 
             "    ?s a ?transType ." + 
+            "  } ." + 
+            "  graph ?g {" + 
             "    ?s ?p ?o ." + 
             "  } ." + 
             "%s" +
