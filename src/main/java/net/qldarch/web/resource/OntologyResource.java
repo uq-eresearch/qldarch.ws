@@ -1,4 +1,4 @@
-package net.qldarch.web.service;
+package net.qldarch.web.resource;
 
 import java.net.URI;
 import javax.ws.rs.GET;
@@ -8,6 +8,9 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 
+import net.qldarch.web.service.KnownPrefixes;
+import net.qldarch.web.service.MetadataRepositoryException;
+import net.qldarch.web.util.SparqlToJsonString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

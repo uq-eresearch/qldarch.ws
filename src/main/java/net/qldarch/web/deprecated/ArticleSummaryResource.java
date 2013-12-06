@@ -1,22 +1,12 @@
-package net.qldarch.web.service;
+package net.qldarch.web.deprecated;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.Value;
-import org.openrdf.query.*;
-import org.openrdf.repository.Repository;
-import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.http.HTTPRepository;
+import net.qldarch.web.util.SparqlToJsonString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.HashMap;
-import java.util.Map;
 
 @Path("/articleSummary")
 public class ArticleSummaryResource {

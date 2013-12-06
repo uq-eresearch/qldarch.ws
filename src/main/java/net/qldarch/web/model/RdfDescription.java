@@ -1,5 +1,7 @@
-package net.qldarch.web.service;
+package net.qldarch.web.model;
 
+import net.qldarch.web.service.KnownPrefixes;
+import net.qldarch.web.service.MetadataRepositoryException;
 import org.codehaus.jackson.annotate.JsonAnyGetter;
 import org.codehaus.jackson.annotate.JsonAnySetter;
 import org.codehaus.jackson.annotate.JsonIgnore;

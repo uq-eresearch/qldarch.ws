@@ -1,11 +1,13 @@
-package net.qldarch.web.service;
+package net.qldarch.web.resource;
 
+import net.qldarch.web.model.RdfDescription;
+import net.qldarch.web.model.User;
+import net.qldarch.web.service.KnownPrefixes;
+import net.qldarch.web.service.MetadataRepositoryException;
+import net.qldarch.web.service.RdfDataStoreDao;
+import net.qldarch.web.util.SparqlToJsonString;
+import org.apache.commons.io.IOUtils;
 import org.codehaus.jackson.map.ObjectMapper;
-import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Multimap;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,23 +15,18 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 
-import static com.google.common.base.Optional.fromNullable;
-import static com.google.common.collect.Collections2.transform;
 import static javax.ws.rs.core.Response.Status;
 
 import static net.qldarch.web.service.KnownURIs.*;
@@ -43,49 +40,27 @@ public class AnnotationResource {
 
     private RdfDataStoreDao rdfDao;
 
-    public static String annotationQuery(URI annotation, BigDecimal time, BigDecimal duration) {
+    private static String ANNOTATION_BY_UTTERANCE_FORMAT = loadQueryFormat("queries/AnnotationsByUtterance.sparql");
+
+    public static String prepareAnnotationByUtteranceQuery(URI annotation, BigDecimal time, BigDecimal duration) {
         BigDecimal end = time.add(duration);
 
-        String formatStr = 
-            "PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#> " +
-            "PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#> " +
-            "PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> " +
-            "select distinct ?s ?p ?o  where {   " +
-            "    graph <http://qldarch.net/rdf/2013-09/catalog> {" +
-            "        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g. " +
-            "    } . " +
-            "    graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
-            "       ?t rdfs:subClassOf :Relationship ." +
-            "    } . " +
-            "    graph ?g {" +
-            "        ?r a ?t ." +
-            "        ?r :evidence ?e ." +
-            "        ?e :documentedBy <%s> ." +
-            "        ?e :timeFrom ?start ." +
-            "        ?e :timeTo ?end ." +
-            "    } . " +
-            "    {   " +
-            "        graph ?g {" +
-            "            BIND (?r AS ?s) ." +
-            "            ?s ?p ?o ." +
-            "        } ." +
-            "    } UNION {" +
-            "        graph ?g {" +
-            "            ?r :evidence ?s ." +
-            "            ?s ?p ?o ." +
-            "        } ." +
-            "    } ." +
-            "    FILTER ( xsd:decimal(\"%s\") <= ?end &&" +
-            "             xsd:decimal(\"%s\") >= ?start ) . " +
-            "} ";
-
-        String query = String.format(formatStr, annotation, time, end);
+        String query = String.format(ANNOTATION_BY_UTTERANCE_FORMAT, annotation, time, end);
 
         logger.debug("AnnotationResource performing SPARQL query: {}", query);
         
         return query;
     }
 
+    private static String loadQueryFormat(String queryResource) {
+        try {
+            return IOUtils.toString(AnnotationResource.class.getClassLoader().getResourceAsStream(queryResource));
+        } catch (Exception e) {
+            logger.error("Failed to load {} from classpath", queryResource, e);
+            throw new IllegalStateException("Failed to load " + queryResource + " from classpath", e);
+        }
+
+    }
     @GET
     @Produces("application/json")
     public Response performGet(
@@ -140,7 +115,7 @@ public class AnnotationResource {
         logger.debug("Raw annotations query: {}, {}, {}", resource, time, duration);
 
         String result = new SparqlToJsonString().performQuery(
-                annotationQuery(resource, time, duration));
+                prepareAnnotationByUtteranceQuery(resource, time, duration));
 
         return Response.ok()
             .entity(result)
@@ -154,7 +129,7 @@ public class AnnotationResource {
     public Response addAnnotation(String json) throws IOException {
         RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
-        // Check User Authz
+        // Check User Auth
         User user = User.currentUser();
 
         if (user.isAnon()) {

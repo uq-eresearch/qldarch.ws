@@ -1,5 +1,8 @@
 package net.qldarch.web.service;
 
+import net.qldarch.web.model.QldarchOntology;
+import net.qldarch.web.model.RdfDescription;
+import net.qldarch.web.model.User;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;

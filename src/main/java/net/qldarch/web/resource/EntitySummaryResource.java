@@ -1,15 +1,16 @@
-package net.qldarch.web.service;
+package net.qldarch.web.resource;
 
+import net.qldarch.web.model.QldarchOntology;
+import net.qldarch.web.model.RdfDescription;
+import net.qldarch.web.model.User;
+import net.qldarch.web.service.*;
+import net.qldarch.web.util.Functions;
+import net.qldarch.web.util.SparqlToJsonString;
 import org.codehaus.jackson.map.ObjectMapper;
-import com.google.common.base.Function;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
-import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,24 +32,22 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 
 import static com.google.common.base.Functions.toStringFunction;
-import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
 import static javax.ws.rs.core.Response.Status;
 
 import static net.qldarch.web.service.KnownURIs.*;
 
-/* FIXME: Consider refactor with EntitySummaryResource */
+@Path("/entity")
+public class EntitySummaryResource {
+    public static Logger logger = LoggerFactory.getLogger(EntitySummaryResource.class);
 
-@Path("/expression")
-public class ExpressionResource {
-    public static Logger logger = LoggerFactory.getLogger(ExpressionResource.class);
-
-    public static String USER_EXPRESSION_GRAPH_FORMAT = "http://qldarch.net/users/%s/expressions";
+    public static String USER_ENTITY_GRAPH_FORMAT = "http://qldarch.net/users/%s/entities";
 
     private RdfDataStoreDao rdfDao;
 
-    public static String queryByTypes(Collection<URI> types, boolean summary) {
+    public static String queryByTypes(Collection<URI> types, long since,
+            boolean includeSubClass, boolean includeSuperClass, boolean summary) {
         if (types.size() < 1) {
             throw new IllegalArgumentException("Empty type collection passed to queryByTypes()");
         }
@@ -59,19 +58,20 @@ public class ExpressionResource {
             "select distinct ?s ?p ?o where  {" + 
             "  {" + 
             "    graph <http://qldarch.net/rdf/2013-09/catalog> {" + 
-            "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasExpressionGraph> ?g." + 
+            "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g." + 
             "    } ." + 
             "  } UNION {" + 
-            "    BIND ( <http://qldarch.net/ns/omeka-export/2013-02-06> AS ?g ) ." + 
+            "    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) ." + 
             "  } ." + 
-            "  graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" + 
-            "    ?transType rdfs:subClassOf ?type ." + 
-            "  } ." + 
+            "  { " +
+            "%s" +
+            "%s" +
+            "    BIND ( ?type AS ?transType ) ." +
+            "  } ." +
             "  graph ?g {" + 
             "    ?s a ?transType ." + 
-            "  } ." + 
-            "  graph ?g {" + 
             "    ?s ?p ?o ." + 
+//            "    OPTIONAL { ?s :evidence ?e . ?e :assertionDate ?date . } .
             "  } ." + 
             "%s" +
             "} BINDINGS ?type { ( <");
@@ -81,14 +81,31 @@ public class ExpressionResource {
             "    ?p a :SummaryProperty ." + 
             "  } ";
 
+        String subClassClause = 
+            "     graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
+            "       ?transType rdfs:subClassOf ?type ." +
+            "     } ." +
+            "   } UNION {";
+
+        String superClassClause =
+            "     graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
+            "       ?type rdfs:subClassOf ?transType ." +
+            "     } ." +
+            "   } UNION {";
+
         String baseQuery = Joiner.on(">) (<")
             .appendTo(builder, transform(types, toStringFunction()))
             .append(">) }")
             .toString();
 
-        String query = String.format(baseQuery, (summary ? summaryRestriction : ""));
+ //       String filteredQuery = baseQuery.append("FILTER ( ISBOUND(?date) && ?date >= since )");
 
-        logger.debug("ExpressionResource performing SPARQL query: {}", query);
+        String query = String.format(baseQuery,
+                (includeSubClass ? subClassClause : ""),
+                (includeSuperClass ? superClassClause : ""),
+                (summary ? summaryRestriction : ""));
+
+        logger.debug("EntityResource performing SPARQL query: {}", query);
 
         return query;
     }
@@ -98,9 +115,12 @@ public class ExpressionResource {
     @Path("summary/{type}")
     public String summaryGet(
             @DefaultValue("") @PathParam("type") String type,
+            @DefaultValue("false") @QueryParam("INCSUBCLASS") boolean includeSubClass,
+            @DefaultValue("false") @QueryParam("INCSUPERCLASS") boolean includeSuperClass,
+            @DefaultValue("0") @QueryParam("since") long since,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
-        return findByType(type, typelist, true);
+        return findByType(type, typelist, since, includeSubClass, includeSuperClass, true);
     }
 
     /**
@@ -115,13 +135,19 @@ public class ExpressionResource {
     @Path("detail/{type}")
     public String detailGet(
             @DefaultValue("") @PathParam("type") String type,
+            @DefaultValue("false") @QueryParam("INCSUBCLASS") boolean includeSubClass,
+            @DefaultValue("false") @QueryParam("INCSUPERCLASS") boolean includeSuperClass,
+            @DefaultValue("0") @QueryParam("since") long since,
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
-        return findByType(type, typelist, false);
+        return findByType(type, typelist, since, includeSubClass, includeSuperClass, false);
     }
 
-    public String findByType(String type, String typelist, boolean summary) {
+    public String findByType(String type, String typelist, long since,
+            boolean includeSubClass, boolean includeSuperClass, boolean summary) {
         logger.debug("Querying summary({}) by type: {}, typelist: {}", summary, type, typelist);
+
+        if (since < 0) since = 0;  // Sanitise since
 
         Set<String> typeStrs = newHashSet(
                 Splitter.on(',').trimResults().omitEmptyStrings().split(typelist));
@@ -131,7 +157,8 @@ public class ExpressionResource {
 
         logger.debug("Raw types: {}", typeURIs);
 
-        return new SparqlToJsonString().performQuery(queryByTypes(typeURIs, summary));
+        return new SparqlToJsonString().performQuery(
+                queryByTypes(typeURIs, since, includeSubClass, includeSuperClass, summary));
     }
 
     public static String queryByIds(Collection<URI> ids, boolean summary) {
@@ -145,7 +172,7 @@ public class ExpressionResource {
             "select distinct ?s ?p ?o where  {" + 
             "  {" + 
             "    graph <http://qldarch.net/rdf/2013-09/catalog> {" + 
-            "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasExpressionGraph> ?g." + 
+            "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g." + 
             "    } ." + 
             "  } UNION {" + 
             "    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) ." + 
@@ -168,7 +195,7 @@ public class ExpressionResource {
 
         String query = String.format(baseQuery, (summary ? summaryRestriction : ""));
 
-        logger.debug("ExpressionResource performing SPARQL query: {}", query);
+        logger.debug("EntityResource performing SPARQL query: {}", query);
 
         return query;
     }
@@ -196,8 +223,8 @@ public class ExpressionResource {
     @POST
     @Path("description")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:expression")
-    public Response addExpression(String json) throws IOException {
+    @RequiresPermissions("create:entity")
+    public Response addEntity(String json) throws IOException {
         RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
         // Check User Authz
@@ -211,9 +238,9 @@ public class ExpressionResource {
                 .build();
         }
 
-        URI userExpressionGraph = user.getExpressionGraph();
+        URI userEntityGraph = user.getEntityGraph();
 
-        // Check Expression type
+        // Check Entity type
         List<URI> types = rdf.getType();
         if (types.size() == 0) {
             logger.info("Bad request received. No rdf:type provided: {}", rdf);
@@ -247,28 +274,26 @@ public class ExpressionResource {
                         .build();
                 }
                 URI evType = evTypes.get(0);
-                URI evId = user.newId(userExpressionGraph, evType);
+                URI evId = user.newId(userEntityGraph, evType);
                 
                 ev.setURI(evId);
                 ev.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
                 ev.replaceProperty(QA_ASSERTION_DATE, new Date());
 
-                this.getRdfDao().performInsert(ev, user, QAC_HAS_EXPRESSION_GRAPH,
-                        user.getExpressionGraph());
+                this.getRdfDao().performInsert(ev, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
             }
 
             URI type = types.get(0);
             validateRequiredToCreate(rdf, type);
 
-            URI id = user.newId(userExpressionGraph, type);
+            URI id = user.newId(userEntityGraph, type);
 
             rdf.setURI(id);
 
             // Generate and Perform insert query
-            this.getRdfDao().performInsert(rdf, user, QAC_HAS_EXPRESSION_GRAPH,
-                    userExpressionGraph);
+            this.getRdfDao().performInsert(rdf, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insert graph:{}, rdf:{})", userExpressionGraph, rdf, em);
+            logger.warn("Error performing insert graph:{}, rdf:{})", userEntityGraph, rdf, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)

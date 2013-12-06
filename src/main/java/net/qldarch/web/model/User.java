@@ -1,5 +1,7 @@
-package net.qldarch.web.service;
+package net.qldarch.web.model;
 
+import net.qldarch.web.service.KnownPrefixes;
+import net.qldarch.web.service.MetadataRepositoryException;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
@@ -22,8 +24,8 @@ public class User {
 
     private String username;
 
-    // FIXME: Made package scope to allow testing.
-    User(String username) {
+    // FIXME: Made public scope to allow testing.
+    public User(String username) {
         this.username = Validators.username(username);
     }
 

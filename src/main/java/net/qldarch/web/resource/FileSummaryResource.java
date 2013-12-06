@@ -1,5 +1,11 @@
-package net.qldarch.web.service;
+package net.qldarch.web.resource;
 
+import net.qldarch.web.model.RdfDescription;
+import net.qldarch.web.model.User;
+import net.qldarch.web.service.KnownPrefixes;
+import net.qldarch.web.service.MetadataRepositoryException;
+import net.qldarch.web.service.RdfDataStoreDao;
+import net.qldarch.web.util.SparqlToJsonString;
 import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
@@ -28,7 +34,6 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;

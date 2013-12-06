@@ -1,14 +1,14 @@
-package net.qldarch.web.service;
+package net.qldarch.web.deprecated;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import net.qldarch.web.util.SparqlToJsonString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.Collection;
 import java.util.Set;
 import javax.ws.rs.DefaultValue;

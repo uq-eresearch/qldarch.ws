@@ -1,5 +1,6 @@
-package net.qldarch.web.service;
+package net.qldarch.web.deprecated;
 
+import net.qldarch.web.util.SparqlToJsonString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

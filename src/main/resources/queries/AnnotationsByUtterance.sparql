@@ -1,0 +1,32 @@
+# Takes 3 parameters Transcript URI; Lower Time Bound (sec); Upper Time Bound (sec)
+
+PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?s ?p ?o  where {
+    graph <http://qldarch.net/rdf/2013-09/catalog> {
+        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g.
+    } .
+    graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {
+       ?t rdfs:subClassOf :Relationship .
+    } .
+    graph ?g {
+        ?r a ?t .
+        ?r :evidence ?e .
+        ?e :documentedBy <%s> .
+        ?e :timeFrom ?start .
+        ?e :timeTo ?end .
+    } .
+    {
+        graph ?g {
+            BIND (?r AS ?s) .
+            ?s ?p ?o .
+        } .
+    } UNION {
+        graph ?g {
+            ?r :evidence ?s .
+            ?s ?p ?o .
+        } .
+    } .
+    FILTER ( xsd:decimal("%s") <= ?end && xsd:decimal("%s") >= ?start ) .
+}

@@ -1,4 +1,4 @@
-package net.qldarch.web.service;
+package net.qldarch.web.util;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.Value;

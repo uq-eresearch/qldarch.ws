@@ -1,4 +1,4 @@
-package net.qldarch.web.service;
+package net.qldarch.web.resource;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.FormParam;
