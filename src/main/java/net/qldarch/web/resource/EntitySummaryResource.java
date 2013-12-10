@@ -7,12 +7,12 @@ import net.qldarch.web.service.*;
 import net.qldarch.web.util.Functions;
 import net.qldarch.web.util.SparqlToJsonString;
 import org.codehaus.jackson.map.ObjectMapper;
-import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Multimap;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.stringtemplate.v4.STGroupFile;
 
 import java.io.IOException;
 import java.net.URI;
@@ -31,7 +31,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 
-import static com.google.common.base.Functions.toStringFunction;
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
 import static javax.ws.rs.core.Response.Status;
@@ -46,73 +45,26 @@ public class EntitySummaryResource {
 
     private RdfDataStoreDao rdfDao;
 
-    public static String queryByTypes(Collection<URI> types, long since,
-            boolean includeSubClass, boolean includeSuperClass, boolean summary) {
-        if (types.size() < 1) {
-            throw new IllegalArgumentException("Empty type collection passed to queryByTypes()");
-        }
+    private static final STGroupFile ENTITY_QUERIES = new STGroupFile("queries/Entities.sparql.stg");
 
-        StringBuilder builder = new StringBuilder(
-            "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " + 
-            "PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> " + 
-            "select distinct ?s ?p ?o where  {" + 
-            "  {" + 
-            "    graph <http://qldarch.net/rdf/2013-09/catalog> {" + 
-            "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g." + 
-            "    } ." + 
-            "  } UNION {" + 
-            "    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) ." + 
-            "  } ." + 
-            "  { " +
-            "%s" +
-            "%s" +
-            "    BIND ( ?type AS ?transType ) ." +
-            "  } ." +
-            "  graph ?g {" + 
-            "    ?s a ?transType ." + 
-            "    ?s ?p ?o ." + 
-//            "    OPTIONAL { ?s :evidence ?e . ?e :assertionDate ?date . } .
-            "  } ." + 
-            "%s" +
-            "} BINDINGS ?type { ( <");
+    public static String prepareEntitiesByTypesQuery(Collection<URI> types, long since,
+             boolean includeSubClass, boolean includeSuperClass, boolean summary) {
 
-        String summaryRestriction =
-            "  graph <http://qldarch.net/ns/rdf/2012-06/terms#> {" + 
-            "    ?p a :SummaryProperty ." + 
-            "  } ";
+        String query = ENTITY_QUERIES.getInstanceOf("byType")
+                .add("types", types)
+                .add("incSubClass", includeSubClass)
+                .add("incSuperClass", includeSuperClass)
+                .add("summary", summary)
+                .render();
 
-        String subClassClause = 
-            "     graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
-            "       ?transType rdfs:subClassOf ?type ." +
-            "     } ." +
-            "   } UNION {";
-
-        String superClassClause =
-            "     graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {" +
-            "       ?type rdfs:subClassOf ?transType ." +
-            "     } ." +
-            "   } UNION {";
-
-        String baseQuery = Joiner.on(">) (<")
-            .appendTo(builder, transform(types, toStringFunction()))
-            .append(">) }")
-            .toString();
-
- //       String filteredQuery = baseQuery.append("FILTER ( ISBOUND(?date) && ?date >= since )");
-
-        String query = String.format(baseQuery,
-                (includeSubClass ? subClassClause : ""),
-                (includeSuperClass ? superClassClause : ""),
-                (summary ? summaryRestriction : ""));
-
-        logger.debug("EntityResource performing SPARQL query: {}", query);
+        logger.debug("AnnotationResource performing SPARQL query: {}", query);
 
         return query;
     }
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    @Path("summary/{type}")
+    @Path("summary/{type : ([^/]+)?}")
     public String summaryGet(
             @DefaultValue("") @PathParam("type") String type,
             @DefaultValue("false") @QueryParam("INCSUBCLASS") boolean includeSubClass,
@@ -132,7 +84,7 @@ public class EntitySummaryResource {
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    @Path("detail/{type}")
+    @Path("detail/{type : ([^/]+)?}")
     public String detailGet(
             @DefaultValue("") @PathParam("type") String type,
             @DefaultValue("false") @QueryParam("INCSUBCLASS") boolean includeSubClass,
@@ -158,42 +110,18 @@ public class EntitySummaryResource {
         logger.debug("Raw types: {}", typeURIs);
 
         return new SparqlToJsonString().performQuery(
-                queryByTypes(typeURIs, since, includeSubClass, includeSuperClass, summary));
+                prepareEntitiesByTypesQuery(typeURIs, since, includeSubClass, includeSuperClass, summary));
     }
 
-    public static String queryByIds(Collection<URI> ids, boolean summary) {
+    public static String findByIds(Collection<URI> ids, boolean summary) {
         if (ids.size() < 1) {
-            throw new IllegalArgumentException("Empty id collection passed to queryByIds()");
+            throw new IllegalArgumentException("Empty id collection passed to findByIds()");
         }
 
-        StringBuilder builder = new StringBuilder(
-            "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " + 
-            "PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> " + 
-            "select distinct ?s ?p ?o where  {" + 
-            "  {" + 
-            "    graph <http://qldarch.net/rdf/2013-09/catalog> {" + 
-            "      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g." + 
-            "    } ." + 
-            "  } UNION {" + 
-            "    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) ." + 
-            "  } ." + 
-            "  graph ?g {" + 
-            "    ?s ?p ?o ." + 
-            "  } ." + 
-            "%s" +
-            "} BINDINGS ?s { ( <");
-
-        String summaryRestriction =
-            "  graph <http://qldarch.net/ns/rdf/2012-06/terms#> {" + 
-            "    ?p a :SummaryProperty ." + 
-            "  } ";
-
-        String baseQuery = Joiner.on(">) (<")
-            .appendTo(builder, transform(ids, toStringFunction()))
-            .append(">) }")
-            .toString();
-
-        String query = String.format(baseQuery, (summary ? summaryRestriction : ""));
+        String query = ENTITY_QUERIES.getInstanceOf("byIds")
+                .add("ids", ids)
+                .add("summary", summary)
+                .render();
 
         logger.debug("EntityResource performing SPARQL query: {}", query);
 
@@ -217,7 +145,7 @@ public class EntitySummaryResource {
 
         logger.debug("Raw ids: {}", idURIs);
 
-        return new SparqlToJsonString().performQuery(queryByIds(idURIs, summary));
+        return new SparqlToJsonString().performQuery(findByIds(idURIs, summary));
     }
  
     @POST

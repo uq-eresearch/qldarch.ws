@@ -5,12 +5,13 @@ import net.qldarch.web.model.User;
 import net.qldarch.web.service.KnownPrefixes;
 import net.qldarch.web.service.MetadataRepositoryException;
 import net.qldarch.web.service.RdfDataStoreDao;
+import net.qldarch.web.util.ResourceUtils;
 import net.qldarch.web.util.SparqlToJsonString;
-import org.apache.commons.io.IOUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.stringtemplate.v4.STGroupFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -40,27 +41,21 @@ public class AnnotationResource {
 
     private RdfDataStoreDao rdfDao;
 
-    private static String ANNOTATION_BY_UTTERANCE_FORMAT = loadQueryFormat("queries/AnnotationsByUtterance.sparql");
+    private static final STGroupFile ANNOTATION_QUERIES = new STGroupFile("queries/Annotations.sparql.stg");
 
     public static String prepareAnnotationByUtteranceQuery(URI annotation, BigDecimal time, BigDecimal duration) {
         BigDecimal end = time.add(duration);
 
-        String query = String.format(ANNOTATION_BY_UTTERANCE_FORMAT, annotation, time, end);
-
+        String query = ANNOTATION_QUERIES.getInstanceOf("byUtterance")
+                .add("resource", annotation)
+                .add("lower", time)
+                .add("upper", end)
+                .render();
         logger.debug("AnnotationResource performing SPARQL query: {}", query);
-        
+
         return query;
     }
 
-    private static String loadQueryFormat(String queryResource) {
-        try {
-            return IOUtils.toString(AnnotationResource.class.getClassLoader().getResourceAsStream(queryResource));
-        } catch (Exception e) {
-            logger.error("Failed to load {} from classpath", queryResource, e);
-            throw new IllegalStateException("Failed to load " + queryResource + " from classpath", e);
-        }
-
-    }
     @GET
     @Produces("application/json")
     public Response performGet(
@@ -88,38 +83,94 @@ public class AnnotationResource {
                 .build();
         }
 
-        URI resource = null;
-        BigDecimal time = null;
-        BigDecimal duration = null;
         try {
-            resource = KnownPrefixes.resolve(resourceStr);
-            time = new BigDecimal(timeStr);
-            duration = new BigDecimal(durationStr);
-        } catch (MetadataRepositoryException em) {
-            logger.info("Unable to resolve submitted URI: {}", resourceStr, em);
-            return Response
-                .status(Status.BAD_REQUEST)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("QueryParam RESOURCE malformed")
+            URI resource = resolveURI(resourceStr, "resource");
+            BigDecimal time = parseDecimal(timeStr, "time");
+            BigDecimal duration = parseDecimal(durationStr, "duration");
+
+            logger.debug("Raw annotations query: {}, {}, {}", resource, time, duration);
+
+            String result = new SparqlToJsonString().performQuery(
+                    prepareAnnotationByUtteranceQuery(resource, time, duration));
+
+            return Response.ok()
+                .entity(result)
                 .build();
-        } catch (NumberFormatException en) {
-            logger.info("Malformed xsd:decimal submitted to annotations request: {}/{}",
-                timeStr, durationStr, en);
-            return Response
-                .status(Status.BAD_REQUEST)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("QueryParam TIME or DURATION malformed")
-                .build();
+        } catch (ResourceFailedException er) {
+            return er.getResponse();
+        }
+    }
+
+    public static String prepareAnnotationByRelationshipQuery(URI subject, URI predicate, URI object) {
+        String query = ANNOTATION_QUERIES.getInstanceOf("byRelationship")
+                .add("subject", subject)
+                .add("predicate", predicate)
+                .add("object", object)
+                .render();
+
+        logger.debug("Annotation by Relationship SPARQL: {}", query);
+
+        return query;
+    }
+
+    @GET
+    @Path("relationship")
+    @Produces("application/json")
+    public Response annotationsByRelationship(
+            @DefaultValue("") @QueryParam("subject") String subjectStr,
+            @DefaultValue("") @QueryParam("predicate") String predicateStr,
+            @DefaultValue("") @QueryParam("object") String objectStr) {
+
+        logger.debug("Querying annotations by relationship subject: {}, predicate: {}, object: {}",
+                subjectStr, predicateStr, objectStr);
+
+        try {
+            URI subject = resolveURI(subjectStr, "subject");
+            URI predicate = resolveURI(predicateStr, "predicate");
+            URI object = resolveURI(objectStr, "object");
+
+            logger.debug("Raw annotations query: {}, {}, {}", subject, predicate, object);
+
+            String result = new SparqlToJsonString().performQuery(
+                    prepareAnnotationByRelationshipQuery(subject, predicate, object));
+
+            return Response.ok()
+                    .entity(result)
+                    .build();
+        } catch (ResourceFailedException er) {
+            return er.getResponse();
         }
 
-        logger.debug("Raw annotations query: {}, {}, {}", resource, time, duration);
+    }
 
-        String result = new SparqlToJsonString().performQuery(
-                prepareAnnotationByUtteranceQuery(resource, time, duration));
+    private URI resolveURI(String uriStr, String description) throws ResourceFailedException {
+        try {
+            if (uriStr == null || uriStr.isEmpty()) return null;
+            return KnownPrefixes.resolve(uriStr);
+        } catch (MetadataRepositoryException em) {
+            String msg = String.format("Unable to resolve %s URI: %s", description, uriStr);
+            logger.info(msg, em);
+            throw new ResourceFailedException(msg, em,
+                    Response.status(Status.BAD_REQUEST)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity(msg)
+                    .build());
+        }
+    }
 
-        return Response.ok()
-            .entity(result)
-            .build();
+    private BigDecimal parseDecimal(String decimal, String description) throws ResourceFailedException {
+        try {
+            if (decimal == null || decimal.isEmpty()) return null;
+            return new BigDecimal(decimal);
+        } catch (NumberFormatException en) {
+            String msg = String.format("Unable to parse %s as xsd:decimal: %s", description, decimal);
+            logger.info(msg, en);
+            throw new ResourceFailedException(msg, en,
+                    Response.status(Status.BAD_REQUEST)
+                            .type(MediaType.TEXT_PLAIN)
+                            .entity(msg)
+                            .build());
+        }
     }
 
     @POST

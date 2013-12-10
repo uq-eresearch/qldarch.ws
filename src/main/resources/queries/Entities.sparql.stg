@@ -1,0 +1,68 @@
+delimiters "$", "$"
+
+byType(types, incSubClass, incSuperClass, summary) ::= <<
+PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+
+select distinct ?s ?p ?o where  {
+    {
+        graph <http://qldarch.net/rdf/2013-09/catalog> {
+            ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g.
+        }
+    } UNION {
+        BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g )
+    }
+    {
+        $if(incSubClass)$$withSubClasses()$$endif$
+        $if(incSupClass)$$withSuperClasses()$$endif$
+        BIND ( ?type AS ?transType ) .
+    } .
+    graph ?g {
+        ?s a ?transType .
+        ?s ?p ?o .
+    } .
+    $if(summary)$$restrictToSummary()$$endif$
+} BINDINGS ?type { $types:usingBinding(); separator=" "$ }
+>>
+
+withSubClasses() ::= <<
+    graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {
+        ?transType rdfs:subClassOf ?type .
+    } .
+} UNION {
+>>
+
+withSuperClasses() ::= <<
+    graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {
+        ?type rdfs:subClassOf ?transType .
+    } .
+} UNION {
+>>
+
+restrictToSummary() ::= <<
+graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {
+    ?p a :SummaryProperty .
+} .
+>>
+
+usingBinding(binding) ::= <<
+( <$binding$> )
+>>
+
+byIds(ids, summary) ::= <<
+PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?s ?p ?o where  {
+  {
+    graph <http://qldarch.net/rdf/2013-09/catalog> {
+      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g.
+    } .
+  } UNION {
+    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) .
+  } .
+  graph ?g {
+    ?s ?p ?o .
+  } .
+  $if(summary)$$restrictToSummary()$$endif$
+} BINDINGS ?s { $ids:usingBinding(); separator=" "$ }
+>>
