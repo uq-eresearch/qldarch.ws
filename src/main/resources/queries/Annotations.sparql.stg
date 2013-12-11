@@ -60,3 +60,40 @@ forSubject(subject) ::= "?s :subject <$subject$> ."
 forPredicate(predicate) ::= "?s :predicate <$predicate$> ."
 
 forObject(object) ::= "?s :object <$object$> ."
+
+byEvidenceIds(ids) ::= <<
+PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?s ?p ?o where  {
+    graph <http://qldarch.net/rdf/2013-09/catalog> {
+      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g.
+    } .
+    graph ?g {
+        ?s a :Evidence .
+        ?s ?p ?o .
+    } .
+} BINDINGS ?s { $ids:usingBinding(); separator=" "$ }
+>>
+
+byRelationships(ids) ::= <<
+PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?s ?p ?o  where {
+    graph <http://qldarch.net/rdf/2013-09/catalog> {
+        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g1.
+        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g2.
+    } .
+    graph ?g1 {
+        ?r :evidence ?e .
+    } .
+    graph ?g2 {
+        BIND (?e AS ?s) .
+        ?s ?p ?o .
+    } .
+} BINDINGS ?r { $ids:usingBinding(); separator=" "$ }
+>>
+
+usingBinding(binding) ::= <<
+( <$binding$> )
+>>

@@ -1,11 +1,12 @@
 package net.qldarch.web.resource;
 
+import com.google.common.base.Splitter;
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
 import net.qldarch.web.service.KnownPrefixes;
 import net.qldarch.web.service.MetadataRepositoryException;
 import net.qldarch.web.service.RdfDataStoreDao;
-import net.qldarch.web.util.ResourceUtils;
+import net.qldarch.web.util.Functions;
 import net.qldarch.web.util.SparqlToJsonString;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -16,18 +17,16 @@ import org.stringtemplate.v4.STGroupFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.POST;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
+import java.util.Set;
+import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 
+import static com.google.common.collect.Collections2.transform;
+import static com.google.common.collect.Sets.newHashSet;
 import static javax.ws.rs.core.Response.Status;
 
 import static net.qldarch.web.service.KnownURIs.*;
@@ -140,7 +139,71 @@ public class AnnotationResource {
         } catch (ResourceFailedException er) {
             return er.getResponse();
         }
+    }
 
+    public static String findEvidenceByIds(Collection<URI> ids) {
+        if (ids.size() < 1) {
+            throw new IllegalArgumentException("Empty id collection passed to findEvidenceByIds()");
+        }
+
+        String query = ANNOTATION_QUERIES.getInstanceOf("evidenceByIds")
+                .add("ids", ids)
+                .render();
+
+        logger.debug("AnnotationResource performing SPARQL query: {}", query);
+
+        return query;
+    }
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("evidence/{id : ([^/]+)?}")
+    public Response getEvidenceById(
+            @DefaultValue("") @PathParam("id") String id,
+            @DefaultValue("") @QueryParam("idlist") String idlist,
+            @DefaultValue("") @QueryParam("relids") String relids) {
+        logger.debug("Querying evidence by id: {}, idlist: {}", id, idlist);
+
+        Set<String> idStrs = newHashSet(
+                Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
+        if (!id.isEmpty()) idStrs.add(id);
+
+        Set<String> relIdStrs = newHashSet(
+                Splitter.on(',').trimResults().omitEmptyStrings().split(relids));
+
+        if (!idStrs.isEmpty() && !relIdStrs.isEmpty()) {
+            logger.info("Bad request: specified both Evidence ids and Relationship ids.");
+            return Response
+                    .status(Status.BAD_REQUEST)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Bad request: specified both Evidence ids and Relationship ids")
+                    .build();
+        }
+
+        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        Collection<URI> relURIs = transform(relIdStrs, Functions.toResolvedURI());
+
+        String result = relURIs.isEmpty() ?
+            new SparqlToJsonString().performQuery(findEvidenceByIds(idURIs)) :
+            new SparqlToJsonString().performQuery(findEvidenceByRelationships(relURIs));
+
+        return Response.ok()
+                .entity(result)
+                .build();
+    }
+
+    private static String findEvidenceByRelationships(Collection<URI> ids) {
+        if (ids.size() < 1) {
+            throw new IllegalArgumentException("Empty id collection passed to findEvidenceByRelationships()");
+        }
+
+        String query = ANNOTATION_QUERIES.getInstanceOf("evidenceByRelationships")
+                .add("ids", ids)
+                .render();
+
+        logger.debug("AnnotationResource performing SPARQL query: {}", query);
+
+        return query;
     }
 
     private URI resolveURI(String uriStr, String description) throws ResourceFailedException {

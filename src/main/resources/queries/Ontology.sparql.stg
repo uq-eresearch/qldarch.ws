@@ -1,0 +1,47 @@
+delimiters "$", "$"
+
+listRelationships() ::= <<
+PREFIX qldarch: <http://qldarch.net/ns/rdf/2012-06/terms#>
+select ?s ?p ?o
+from <http://qldarch.net/ns/rdf/2012-06/terms#>
+where {
+    ?s a qldarch:Relationship .
+    ?s ?p ?o .
+}
+>>
+
+listProperties() ::= <<
+select ?s ?p ?o
+from <http://qldarch.net/ns/rdf/2012-06/terms#>
+where {
+{ ?s rdf:type owl:DatatypeProperty. ?s ?p ?o. }
+    union { ?s rdf:type owl:ObjectProperty. ?s ?p ?o. }
+}
+>>
+
+entitiesByType(type, incSubClass, incSuperClass) ::= <<
+PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?s ?p ?o
+from <http://qldarch.net/ns/rdf/2012-06/terms#>
+where  {
+    BIND ( <$type$> AS ?type ) .
+    {
+    $if(incSubClass)$$withSubClasses()$$endif$
+    $if(incSuperClass)$$withSuperClasses()$$endif$
+        BIND ( ?type AS ?transType ) .
+    } .
+    BIND ( ?transType AS ?s ) .
+    ?s ?p ?o .
+}
+>>
+
+withSubClasses() ::= <<
+    ?transType rdfs:subClassOf ?type .
+} UNION {
+>>
+
+withSuperClasses() ::= <<
+    ?type rdfs:subClassOf ?transType .
+} UNION {
+>>

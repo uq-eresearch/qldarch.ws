@@ -136,7 +136,7 @@ public class ExpressionResource {
 
     public static String queryByIds(Collection<URI> ids, boolean summary) {
         if (ids.size() < 1) {
-            throw new IllegalArgumentException("Empty id collection passed to findByIds()");
+            throw new IllegalArgumentException("Empty id collection passed to findEvidenceByIds()");
         }
 
         StringBuilder builder = new StringBuilder(
