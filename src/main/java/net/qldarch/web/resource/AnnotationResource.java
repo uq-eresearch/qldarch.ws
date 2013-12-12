@@ -146,7 +146,7 @@ public class AnnotationResource {
             throw new IllegalArgumentException("Empty id collection passed to findEvidenceByIds()");
         }
 
-        String query = ANNOTATION_QUERIES.getInstanceOf("evidenceByIds")
+        String query = ANNOTATION_QUERIES.getInstanceOf("byEvidenceIds")
                 .add("ids", ids)
                 .render();
 
@@ -157,11 +157,11 @@ public class AnnotationResource {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    @Path("evidence/{id : ([^/]+)?}")
+    @Path("evidence/{id : (.+)?}")
     public Response getEvidenceById(
             @DefaultValue("") @PathParam("id") String id,
-            @DefaultValue("") @QueryParam("idlist") String idlist,
-            @DefaultValue("") @QueryParam("relids") String relids) {
+            @DefaultValue("") @QueryParam("IDLIST") String idlist,
+            @DefaultValue("") @QueryParam("RELIDS") String relids) {
         logger.debug("Querying evidence by id: {}, idlist: {}", id, idlist);
 
         Set<String> idStrs = newHashSet(
@@ -197,7 +197,7 @@ public class AnnotationResource {
             throw new IllegalArgumentException("Empty id collection passed to findEvidenceByRelationships()");
         }
 
-        String query = ANNOTATION_QUERIES.getInstanceOf("evidenceByRelationships")
+        String query = ANNOTATION_QUERIES.getInstanceOf("byRelationships")
                 .add("ids", ids)
                 .render();
 
