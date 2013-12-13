@@ -285,13 +285,13 @@ public class FileSummaryResource {
         try {
             URI id = user.newId(userFileGraph, QA_DIGITAL_FILE);
             fileDesc.setURI(id);
-            this.getRdfDao().performInsert(fileDesc, user, QAC_HAS_FILE_GRAPH, userFileGraph);
+            this.getRdfDao().insertRdfDescription(fileDesc, user, QAC_HAS_FILE_GRAPH, userFileGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insert graph:{}, rdf:{})", userFileGraph, fileDesc, em);
+            logger.warn("Error performing insertRdfDescription graph:{}, rdf:{})", userFileGraph, fileDesc, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
-                .entity("Error performing insert")
+                .entity("Error performing insertRdfDescription")
                 .build();
         } finally {
             entity = new ObjectMapper().writeValueAsString(fileDesc);

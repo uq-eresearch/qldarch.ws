@@ -189,16 +189,16 @@ public class ReferenceSummaryResource {
         rdf.replaceProperty(QA_ASSERTION_DATE, new Date());
         rdf.replaceProperty(QA_DOCUMENTED_BY, rdf.getValues(QA_SUBJECT));
 
-        // Generate and Perform insert query
+        // Generate and Perform insertRdfDescription query
         try {
-            this.getRdfDao().performInsert(rdf, user, QAC_HAS_REFERENCE_GRAPH, userReferenceGraph);
+            this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_REFERENCE_GRAPH, userReferenceGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insert id:{}, graph:{}, rdf:{})",
+            logger.warn("Error performing insertRdfDescription id:{}, graph:{}, rdf:{})",
                     id, userReferenceGraph, rdf, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
-                .entity("Error performing insert")
+                .entity("Error performing insertRdfDescription")
                 .build();
         }
 

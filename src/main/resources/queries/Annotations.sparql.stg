@@ -97,3 +97,27 @@ select distinct ?s ?p ?o  where {
 usingBinding(binding) ::= <<
 ( <$binding$> )
 >>
+
+unevidencedRelationships() ::= <<
+PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?r  where {
+    graph <http://qldarch.net/rdf/2013-09/catalog> {
+        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g1.
+        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g2.
+    } .
+    graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {
+       ?t rdfs:subClassOf :Relationship .
+    } .
+    {
+        graph ?g1 {
+            ?r a ?t .
+        }
+    } MINUS {
+        graph ?g2 {
+            ?r :evidence _:e .
+        }
+    }
+}
+>>

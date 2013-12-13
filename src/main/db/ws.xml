@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- To deploy insert the appropriate username/password and copy
+<!-- To deploy insertRdfDescription the appropriate username/password and copy
      this file into /etc/tomcat6/Catalina/localhost/ws.xml, or 
      the appropriate context file path in your installation. -->
 <Context debug="0">

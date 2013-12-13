@@ -50,7 +50,7 @@ public class AnnotationResource {
                 .add("lower", time)
                 .add("upper", end)
                 .render();
-        logger.debug("AnnotationResource performing SPARQL query: {}", query);
+        logger.debug("AnnotationResource GET pabyq performing SPARQL query:\n{}", query);
 
         return query;
     }
@@ -150,7 +150,7 @@ public class AnnotationResource {
                 .add("ids", ids)
                 .render();
 
-        logger.debug("AnnotationResource performing SPARQL query: {}", query);
+        logger.debug("AnnotationResource GET febi performing SPARQL query:\n{}", query);
 
         return query;
     }
@@ -201,7 +201,7 @@ public class AnnotationResource {
                 .add("ids", ids)
                 .render();
 
-        logger.debug("AnnotationResource performing SPARQL query: {}", query);
+        logger.debug("AnnotationResource GET febr performing SPARQL query:\n{}", query);
 
         return query;
     }
@@ -275,7 +275,7 @@ public class AnnotationResource {
                 ev.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
                 ev.replaceProperty(QA_ASSERTION_DATE, new Date());
 
-                this.getRdfDao().performInsert(ev, user, QAC_HAS_ANNOTATION_GRAPH,
+                this.getRdfDao().insertRdfDescription(ev, user, QAC_HAS_ANNOTATION_GRAPH,
                         userAnnotationGraph);
             }
 
@@ -293,15 +293,15 @@ public class AnnotationResource {
 
             rdf.setURI(relId);
 
-            // Generate and Perform insert query
-            this.getRdfDao().performInsert(rdf, user, QAC_HAS_ANNOTATION_GRAPH,
+            // Generate and Perform insertRdfDescription query
+            this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_ANNOTATION_GRAPH,
                     userAnnotationGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insert graph:{}, rdf:{})", userAnnotationGraph, rdf, em);
+            logger.warn("Error performing insertRdfDescription graph:{}, rdf:{})", userAnnotationGraph, rdf, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
-                .entity("Error performing insert")
+                .entity("Error performing insertRdfDescription")
                 .build();
         }
 
@@ -310,6 +310,62 @@ public class AnnotationResource {
         // Return
         return Response.created(rdf.getURI())
             .entity(annotation)
+            .build();
+    }
+
+    @DELETE
+    @Path("evidence")
+    @RequiresPermissions("delete:annotation")
+    public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id) {
+        User user = User.currentUser();
+
+        if (user.isAnon()) {
+            return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Anonymous users are not permitted to create annotations")
+                    .build();
+        }
+
+        if (id.isEmpty()) {
+            logger.info("Bad request received. No evidence id provided.");
+            return Response
+                    .status(Status.BAD_REQUEST)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("QueryParam ID missing")
+                    .build();
+        }
+
+        try {
+            URI evidence = KnownPrefixes.resolve(id);
+            this.getRdfDao().deleteRdfResource(evidence);
+        } catch (MetadataRepositoryException e) {
+            logger.warn("Error performing delete evidence:{})", id);
+            return Response
+                    .status(Status.INTERNAL_SERVER_ERROR)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Error performing delete")
+                    .build();
+        }
+
+        List<URI> orphaned = null;
+        try {
+            String query = ANNOTATION_QUERIES.getInstanceOf("unevidencedRelationships").render();
+
+            logger.debug("AnnotationResource DELETE evidence performing SPARQL query:\n{}", query);
+
+            orphaned = this.getRdfDao().queryForRdfResources(query);
+            for (URI orphan : orphaned) {
+                this.getRdfDao().deleteRdfResource(orphan);
+            }
+        } catch (MetadataRepositoryException e) {
+            logger.warn("Error removing orphaned relationships:{})", orphaned);
+        }
+
+        return Response
+            .status(Status.ACCEPTED)
+            .type(MediaType.TEXT_PLAIN)
+            .entity(String.format("Evidence %s deleted", id))
             .build();
     }
 

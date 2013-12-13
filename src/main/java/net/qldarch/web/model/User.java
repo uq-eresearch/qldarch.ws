@@ -18,6 +18,7 @@ public class User {
     public static String USER_REFERENCE_GRAPH_FORMAT = "http://qldarch.net/users/%s/references";
     public static String USER_ANNOTATION_GRAPH_FORMAT = "http://qldarch.net/users/%s/annotations";
     public static String USER_ENTITY_GRAPH_FORMAT = "http://qldarch.net/users/%s/entities";
+    public static String USER_VOCABULARY_GRAPH_FORMAT = "http://qldarch.net/users/%s/vocabulary";
     public static String USER_EXPRESSION_GRAPH_FORMAT = "http://qldarch.net/users/%s/expressions";
     public static String USER_FILE_GRAPH_FORMAT = "http://qldarch.net/users/%s/files";
     public static String USER_URI_FORMAT = "http://qldarch.net/users/%s";
@@ -58,6 +59,9 @@ public class User {
 
     public URI getEntityGraph() {
         return URI.create(String.format(USER_ENTITY_GRAPH_FORMAT, username));
+    }
+    public URI getVocabularyGraph() {
+        return URI.create(String.format(USER_VOCABULARY_GRAPH_FORMAT, username));
     }
 
     public URI getExpressionGraph() {

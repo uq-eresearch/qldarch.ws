@@ -41,8 +41,6 @@ import static net.qldarch.web.service.KnownURIs.*;
 public class EntitySummaryResource {
     public static Logger logger = LoggerFactory.getLogger(EntitySummaryResource.class);
 
-    public static String USER_ENTITY_GRAPH_FORMAT = "http://qldarch.net/users/%s/entities";
-
     private RdfDataStoreDao rdfDao;
 
     private static final STGroupFile ENTITY_QUERIES = new STGroupFile("queries/Entities.sparql.stg");
@@ -208,7 +206,7 @@ public class EntitySummaryResource {
                 ev.replaceProperty(QA_ASSERTED_BY, user.getUserURI());
                 ev.replaceProperty(QA_ASSERTION_DATE, new Date());
 
-                this.getRdfDao().performInsert(ev, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
+                this.getRdfDao().insertRdfDescription(ev, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
             }
 
             URI type = types.get(0);
@@ -218,14 +216,14 @@ public class EntitySummaryResource {
 
             rdf.setURI(id);
 
-            // Generate and Perform insert query
-            this.getRdfDao().performInsert(rdf, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
+            // Generate and Perform insertRdfDescription query
+            this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insert graph:{}, rdf:{})", userEntityGraph, rdf, em);
+            logger.warn("Error performing insertRdfDescription graph:{}, rdf:{})", userEntityGraph, rdf, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
-                .entity("Error performing insert")
+                .entity("Error performing insertRdfDescription")
                 .build();
         }
 

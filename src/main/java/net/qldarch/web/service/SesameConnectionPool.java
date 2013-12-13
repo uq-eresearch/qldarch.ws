@@ -1,5 +1,6 @@
 package net.qldarch.web.service;
 
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
@@ -54,6 +55,29 @@ public class SesameConnectionPool {
         } catch (RepositoryException er) {
             logger.warn("Error performing operation", er);
             throw new MetadataRepositoryException("Error performing operation", er);
+        } finally {
+            try {
+                if (conn != null && conn.isOpen()) {
+                    conn.close();
+                }
+            } catch (RepositoryException erc) {
+                logger.warn("Error closing repository connection", erc);
+            }
+        }
+    }
+
+    public <T> T performQuery(RepositoryQuery<T> operation)
+            throws MetadataRepositoryException {
+        RepositoryConnection conn = null;
+        try {
+            conn = repo.getConnection();
+
+            return operation.query(conn);
+        } catch (MetadataRepositoryException em) {
+            throw em;
+        } catch (RepositoryException er) {
+            logger.warn("Error performing query", er);
+            throw new MetadataRepositoryException("Error performing query", er);
         } finally {
             try {
                 if (conn != null && conn.isOpen()) {
