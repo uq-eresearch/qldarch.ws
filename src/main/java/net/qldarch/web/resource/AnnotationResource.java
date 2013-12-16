@@ -334,15 +334,6 @@ public class AnnotationResource {
 
         Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
 
-        if (idURIs.isEmpty()) {
-            logger.info("Bad request received. No evidence ids provided.");
-            return Response
-                    .status(Status.BAD_REQUEST)
-                    .type(MediaType.TEXT_PLAIN)
-                    .entity("QueryParam ID/IDLIST missing")
-                    .build();
-        }
-
         List<URI> evidenceURIs = null;
         try {
             String query = ANNOTATION_QUERIES.getInstanceOf("confirmEvidenceIds")
@@ -358,6 +349,15 @@ public class AnnotationResource {
                     .status(Status.INTERNAL_SERVER_ERROR)
                     .type(MediaType.TEXT_PLAIN)
                     .entity("Error confirming evidence ids")
+                    .build();
+        }
+
+        if (evidenceURIs.isEmpty()) {
+            logger.info("Bad request received. No evidence ids provided.");
+            return Response
+                    .status(Status.BAD_REQUEST)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("QueryParam ID/IDLIST missing or invalid")
                     .build();
         }
 
