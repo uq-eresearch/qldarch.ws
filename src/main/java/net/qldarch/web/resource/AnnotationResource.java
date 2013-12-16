@@ -323,7 +323,7 @@ public class AnnotationResource {
             return Response
                     .status(Status.FORBIDDEN)
                     .type(MediaType.TEXT_PLAIN)
-                    .entity("Anonymous users are not permitted to create annotations")
+                    .entity("Anonymous users are not permitted to delete annotations")
                     .build();
         }
 
