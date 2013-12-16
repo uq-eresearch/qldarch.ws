@@ -316,7 +316,8 @@ public class AnnotationResource {
     @DELETE
     @Path("evidence")
     @RequiresPermissions("delete:annotation")
-    public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id) {
+    public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id,
+                                   @DefaultValue("") @QueryParam("IDLIST") String idlist) {
         User user = User.currentUser();
 
         if (user.isAnon()) {
@@ -327,25 +328,50 @@ public class AnnotationResource {
                     .build();
         }
 
-        if (id.isEmpty()) {
-            logger.info("Bad request received. No evidence id provided.");
+        Set<String> idStrs = newHashSet(
+                Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
+        if (!id.isEmpty()) idStrs.add(id);
+
+        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+
+        if (idURIs.isEmpty()) {
+            logger.info("Bad request received. No evidence ids provided.");
             return Response
                     .status(Status.BAD_REQUEST)
                     .type(MediaType.TEXT_PLAIN)
-                    .entity("QueryParam ID missing")
+                    .entity("QueryParam ID/IDLIST missing")
                     .build();
         }
 
+        List<URI> evidenceURIs = null;
         try {
-            URI evidence = KnownPrefixes.resolve(id);
-            this.getRdfDao().deleteRdfResource(evidence);
+            String query = ANNOTATION_QUERIES.getInstanceOf("confirmEvidenceIds")
+                    .add("ids", idURIs)
+                    .render();
+
+            logger.debug("AnnotationResource DELETE evidence performing SPARQL id-query:\n{}", query);
+
+            evidenceURIs = this.getRdfDao().queryForRdfResources(query);
         } catch (MetadataRepositoryException e) {
-            logger.warn("Error performing delete evidence:{})", id);
+            logger.warn("Error confirming evidence ids: {})", idURIs);
             return Response
                     .status(Status.INTERNAL_SERVER_ERROR)
                     .type(MediaType.TEXT_PLAIN)
-                    .entity("Error performing delete")
+                    .entity("Error confirming evidence ids")
                     .build();
+        }
+
+        for (URI evidence : evidenceURIs) {
+            try {
+                this.getRdfDao().deleteRdfResource(evidence);
+            } catch (MetadataRepositoryException e) {
+                logger.warn("Error performing delete evidence:{})", evidence);
+                return Response
+                        .status(Status.INTERNAL_SERVER_ERROR)
+                        .type(MediaType.TEXT_PLAIN)
+                        .entity("Error performing delete")
+                        .build();
+            }
         }
 
         List<URI> orphaned = null;

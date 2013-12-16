@@ -57,7 +57,6 @@ public class RdfDataStoreDao {
             @Override
             public List<URI> query(RepositoryConnection conn) throws RepositoryException, MetadataRepositoryException {
                 try {
-
                     TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
                     List<URI> resources = newArrayList();
 
