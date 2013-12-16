@@ -20,14 +20,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.POST;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
+import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 
@@ -236,6 +229,73 @@ public class EntitySummaryResource {
             .build();
     }
 
+    @DELETE
+    @Path("description")
+    @RequiresPermissions("delete:entity")
+    public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id,
+                                   @DefaultValue("") @QueryParam("IDLIST") String idlist) {
+        User user = User.currentUser();
+
+        if (user.isAnon()) {
+            return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Anonymous users are not permitted to delete entities")
+                    .build();
+        }
+
+        Set<String> idStrs = newHashSet(
+                Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
+        if (!id.isEmpty()) idStrs.add(id);
+
+        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+
+        List<URI> entityURIs = null;
+        try {
+            String query = ENTITY_QUERIES.getInstanceOf("confirmEntityIds")
+                    .add("ids", idURIs)
+                    .render();
+
+            logger.debug("EntityResource DELETE evidence performing SPARQL id-query:\n{}", query);
+
+            entityURIs = this.getRdfDao().queryForRdfResources(query);
+        } catch (MetadataRepositoryException e) {
+            logger.warn("Error confirming entity ids: {})", idURIs);
+            return Response
+                    .status(Status.INTERNAL_SERVER_ERROR)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Error confirming entity ids")
+                    .build();
+        }
+
+        if (entityURIs.isEmpty()) {
+            logger.info("Bad request received. No entity ids provided.");
+            return Response
+                    .status(Status.BAD_REQUEST)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("QueryParam ID/IDLIST missing or invalid")
+                    .build();
+        }
+
+        for (URI entity : entityURIs) {
+            try {
+                this.getRdfDao().deleteRdfResource(entity);
+            } catch (MetadataRepositoryException e) {
+                logger.warn("Error performing delete entity:{})", entity);
+                return Response
+                        .status(Status.INTERNAL_SERVER_ERROR)
+                        .type(MediaType.TEXT_PLAIN)
+                        .entity("Error performing delete")
+                        .build();
+            }
+        }
+
+        return Response
+                .status(Status.ACCEPTED)
+                .type(MediaType.TEXT_PLAIN)
+                .entity(String.format("Entity %s deleted", id))
+                .build();
+    }
     private void validateRequiredToCreate(RdfDescription rdf, URI type)
             throws MetadataRepositoryException {
         QldarchOntology ont = this.getRdfDao().getOntology();

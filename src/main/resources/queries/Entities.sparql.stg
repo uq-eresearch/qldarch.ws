@@ -66,3 +66,20 @@ select distinct ?s ?p ?o where  {
   $if(summary)$$restrictToSummary()$$endif$
 } BINDINGS ?s { $ids:usingBinding(); separator=" "$ }
 >>
+
+confirmEntityIds(ids) ::= <<
+PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?r  where {
+    graph <http://qldarch.net/rdf/2013-09/catalog> {
+        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph> ?g1.
+    } .
+    graph <http://qldarch.net/ns/rdf/2012-06/terms#>  {
+       ?t rdfs:subClassOf :Entity .
+    } .
+    graph ?g1 {
+        ?e a ?t .
+        BIND (?e AS ?r) .
+    }
+} BINDINGS ?e { $ids:usingBinding(); separator=" "$ }
+>>
