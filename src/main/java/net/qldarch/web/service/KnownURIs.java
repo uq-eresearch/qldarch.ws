@@ -3,7 +3,11 @@ package net.qldarch.web.service;
 import java.net.URI;
 
 public interface KnownURIs {
-    public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
+    public static final URI XSD_STRING = URI.create("http://www.w3.org/2001/XMLSchema#string");
+    public static final URI XSD_DATE = URI.create("http://www.w3.org/2001/XMLSchema#date");
+    public static final URI XSD_INTEGER = URI.create("http://www.w3.org/2001/XMLSchema#integer");
+    public static final URI XSD_DECIMAL = URI.create("http://www.w3.org/2001/XMLSchema#decimal");
+    public static final URI XSD_BOOLEAN = URI.create("http://www.w3.org/2001/XMLSchema#boolean");
 
     public static final URI QAC_HAS_ANNOTATION_GRAPH = 
         URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasAnnotationGraph");

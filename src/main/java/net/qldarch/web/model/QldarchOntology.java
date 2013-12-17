@@ -5,6 +5,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import net.qldarch.web.service.KnownURIs;
 import net.qldarch.web.service.MetadataRepositoryException;
 import net.qldarch.web.service.RepositoryOperation;
 import net.qldarch.web.service.SesameConnectionPool;
@@ -52,11 +53,6 @@ public class QldarchOntology {
     private static final URI RDFS_RANGE = URI.create("http://www.w3.org/2000/01/rdf-schema#range");
     public static final URI OWL_OBJECT_PROPERTY =
         URI.create("http://www.w3.org/2002/07/owl#ObjectProperty");
-    public static final URI XSD_STRING = URI.create("http://www.w3.org/2001/XMLSchema#string");
-    private static final URI XSD_DATE = URI.create("http://www.w3.org/2001/XMLSchema#date");
-    private static final URI XSD_INTEGER = URI.create("http://www.w3.org/2001/XMLSchema#integer");
-    private static final URI XSD_DECIMAL = URI.create("http://www.w3.org/2001/XMLSchema#decimal");
-    public static final URI XSD_BOOLEAN = URI.create("http://www.w3.org/2001/XMLSchema#boolean");
 
     public static final String DEFAULT_ENTITY_QUERY = 
         "PREFIX qldarch: <http://qldarch.net/ns/rdf/2012-06/terms#> " +
@@ -411,9 +407,9 @@ public class QldarchOntology {
             } else {
                 Collection<Object> ranges = properties.get(property).get(RDFS_RANGE);
                 for (Object rng: ranges) {
-                    if (XSD_STRING.equals(rng)) {
+                    if (KnownURIs.XSD_STRING.equals(rng)) {
                         return new LiteralImpl(object.toString());
-                    } else if (XSD_DATE.equals(rng)) {
+                    } else if (KnownURIs.XSD_DATE.equals(rng)) {
                         if (object instanceof XMLGregorianCalendar) {
                             return new CalendarLiteralImpl((XMLGregorianCalendar)object);
                         } else if (object instanceof Date) {
@@ -447,7 +443,7 @@ public class QldarchOntology {
                                 continue;
                             }
                         }
-                    } else if (XSD_BOOLEAN.equals(rng)) {
+                    } else if (KnownURIs.XSD_BOOLEAN.equals(rng)) {
                         if (object instanceof Boolean) {
                             return new BooleanLiteralImpl(((Boolean)object).booleanValue());
                         } else if (object instanceof String) {
@@ -458,10 +454,10 @@ public class QldarchOntology {
                         }
                         logger.debug("Range of boolean, but object did not convert {}", object);
                         continue;
-                    } else if (XSD_INTEGER.equals(rng)) {
+                    } else if (KnownURIs.XSD_INTEGER.equals(rng)) {
                         if (object instanceof Number) {
                             return new IntegerLiteralImpl(
-                                    BigInteger.valueOf(((Number)object).longValue()));
+                                    BigInteger.valueOf(((Number) object).longValue()));
                         } else {
                             try {
                                 return new IntegerLiteralImpl(new BigInteger(object.toString()));
@@ -471,7 +467,7 @@ public class QldarchOntology {
                                 continue;
                             }
                         }
-                    } else if (XSD_DECIMAL.equals(rng)) {
+                    } else if (KnownURIs.XSD_DECIMAL.equals(rng)) {
                         try {
                             return new DecimalLiteralImpl(
                                     new BigDecimal(object.toString()));

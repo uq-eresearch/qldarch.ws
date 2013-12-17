@@ -5,7 +5,9 @@ import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
 import net.qldarch.web.service.*;
 import net.qldarch.web.util.Functions;
+import net.qldarch.web.util.ResourceUtils;
 import net.qldarch.web.util.SparqlToJsonString;
+import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Multimap;
@@ -16,19 +18,19 @@ import org.stringtemplate.v4.STGroupFile;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
 
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
+import static java.util.Collections.singletonList;
 import static javax.ws.rs.core.Response.Status;
 
 import static net.qldarch.web.service.KnownURIs.*;
+import static net.qldarch.web.util.CollectionUtils.asIterable;
+import static net.qldarch.web.util.ResourceUtils.*;
 
 @Path("/entity")
 public class EntitySummaryResource {
@@ -150,11 +152,7 @@ public class EntitySummaryResource {
         User user = User.currentUser();
 
         if (user.isAnon()) {
-            return Response
-                .status(Status.FORBIDDEN)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Anonymous users are not permitted to create annotations")
-                .build();
+            return forbidden("Anonymous users are not permitted to create annotations");
         }
 
         URI userEntityGraph = user.getEntityGraph();
@@ -163,11 +161,7 @@ public class EntitySummaryResource {
         List<URI> types = rdf.getType();
         if (types.size() == 0) {
             logger.info("Bad request received. No rdf:type provided: {}", rdf);
-            return Response
-                .status(Status.BAD_REQUEST)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("No rdf:type provided")
-                .build();
+            return badRequest("No rdf:type provided");
         }
         try {
             List<RdfDescription> evidences = rdf.getSubGraphs(QA_EVIDENCE);
@@ -186,11 +180,7 @@ public class EntitySummaryResource {
                 List<URI> evTypes = ev.getType();
                 if (evTypes.size() == 0) {
                     logger.info("Bad request received. No rdf:type provided for evidence: {}", ev);
-                    return Response
-                        .status(Status.BAD_REQUEST)
-                        .type(MediaType.TEXT_PLAIN)
-                        .entity("No rdf:type provided for evidence")
-                        .build();
+                    return badRequest("No rdf:type provided for evidence");
                 }
                 URI evType = evTypes.get(0);
                 URI evId = user.newId(userEntityGraph, evType);
@@ -213,11 +203,7 @@ public class EntitySummaryResource {
             this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_ENTITY_GRAPH, userEntityGraph);
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insertRdfDescription graph:{}, rdf:{})", userEntityGraph, rdf, em);
-            return Response
-                .status(Status.INTERNAL_SERVER_ERROR)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Error performing insertRdfDescription")
-                .build();
+            return internalError("Error performing insertRdfDescription");
         }
 
         String entity = new ObjectMapper().writeValueAsString(rdf);
@@ -261,20 +247,12 @@ public class EntitySummaryResource {
             entityURIs = this.getRdfDao().queryForRdfResources(query);
         } catch (MetadataRepositoryException e) {
             logger.warn("Error confirming entity ids: {})", idURIs);
-            return Response
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .type(MediaType.TEXT_PLAIN)
-                    .entity("Error confirming entity ids")
-                    .build();
+            return internalError("Error confirming entity ids");
         }
 
         if (entityURIs.isEmpty()) {
             logger.info("Bad request received. No entity ids provided.");
-            return Response
-                    .status(Status.BAD_REQUEST)
-                    .type(MediaType.TEXT_PLAIN)
-                    .entity("QueryParam ID/IDLIST missing or invalid")
-                    .build();
+            return badRequest("QueryParam ID/IDLIST missing or invalid");
         }
 
         for (URI entity : entityURIs) {
@@ -282,11 +260,7 @@ public class EntitySummaryResource {
                 this.getRdfDao().deleteRdfResource(entity);
             } catch (MetadataRepositoryException e) {
                 logger.warn("Error performing delete entity:{})", entity);
-                return Response
-                        .status(Status.INTERNAL_SERVER_ERROR)
-                        .type(MediaType.TEXT_PLAIN)
-                        .entity("Error performing delete")
-                        .build();
+                return internalError("Error performing delete");
             }
         }
 
@@ -296,6 +270,146 @@ public class EntitySummaryResource {
                 .entity(String.format("Entity %s deleted", id))
                 .build();
     }
+
+
+    // FIXME: Refactor SesameConnectionPool to allow RdfDataStoreDao to offer user-delimited transactions
+    @PUT
+    @Path("description")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RequiresPermissions("create:entity")
+    public Response addEntity(@DefaultValue("") @QueryParam("ID") String id,
+                              String json) throws IOException {
+        // Check User Authz
+        User user = User.currentUser();
+
+        if (user.isAnon()) {
+            return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Anonymous users are not permitted to create annotations")
+                    .build();
+        }
+
+//        Use only for testing.
+//        User user = new User("admin");
+
+        if (id.isEmpty()) {
+            logger.info("Bad request received. No entity id provided.");
+            return badRequest("QueryParam ID missing");
+        }
+
+        URI resource = null;
+        try {
+            resource = KnownPrefixes.resolve(id);
+
+            String query = ENTITY_QUERIES.getInstanceOf("confirmEntityIds")
+                    .add("ids", singletonList(resource))
+                    .render();
+
+            logger.debug("EntityResource DELETE evidence performing SPARQL id-query:\n{}", query);
+
+            List<URI> entityURIs = this.getRdfDao().queryForRdfResources(query);
+            if (entityURIs.isEmpty()) throw new MetadataRepositoryException("No entity with id " + resource + "found");
+        } catch (MetadataRepositoryException e) {
+            logger.warn("Error confirming entity id: {})", id);
+            return internalError("Error confirming entity id");
+        }
+
+        JsonNode delta = new ObjectMapper().readTree(json);
+
+        if (!delta.isObject()) {
+            return badRequest("Delta object must be json object");
+        }
+
+        if (delta.has("delete")) {
+            for (Map.Entry<String, JsonNode> field : asIterable(delta.get("delete").getFields())) {
+                try {
+                    URI predicate = KnownPrefixes.resolve(field.getKey());
+                    for (JsonNode objectField :
+                            field.getValue().isArray() ? field.getValue() : singletonList(field.getValue())) {
+                        if (!objectField.isObject()) {
+                            logger.warn("Delete structure contained invalid object: {}", objectField);
+                            return badRequest("Delete structure contained invalid object");
+                        }
+                        String object = objectField.get("value").asText();
+
+                        URI objectType;
+                        String typeStr = objectField.get("type").asText();
+                        if (typeStr.equals("literal")) {
+                            objectType = KnownPrefixes.resolve(objectField.get("datatype").asText());
+                        } else if (typeStr.equals("uri")) {
+                            objectType = null;
+                        } else if (typeStr.equals("bnode")) {
+                            throw new MetadataRepositoryException("Bnodes not permitted in delta record");
+                        } else {
+                            throw new MetadataRepositoryException("Unknown object type in delta record: " + typeStr);
+                        }
+
+                        try {
+                            this.getRdfDao().deleteRdfStatement(resource, predicate, object, objectType);
+                        } catch (MetadataRepositoryException e) {
+                            String msg = String.format("Error deleting statement %s %s \"%s\"^^<%s>",
+                                    resource, predicate, object, objectType);
+                            logger.warn(msg, e);
+                            return internalError(msg);
+
+                        }
+                    }
+                } catch (MetadataRepositoryException e) {
+                    String msg = String.format("Error deleting property from entity: {}", field);
+                    logger.warn(msg, e);
+                    return internalError(msg);
+                }
+            }
+        }
+
+        URI userEntityGraph = user.getEntityGraph();
+
+        if (delta.has("insert")) {
+            for (Map.Entry<String, JsonNode> field : asIterable(delta.get("insert").getFields())) {
+                try {
+                    URI predicate = KnownPrefixes.resolve(field.getKey());
+                    for (JsonNode objectField :
+                            field.getValue().isArray() ? field.getValue() : singletonList(field.getValue())) {
+                        if (!objectField.isObject()) {
+                            logger.warn("Insert structure contained invalid object: {}", objectField);
+                            return badRequest("Insert structure contained invalid object");
+                        }
+                        String object = objectField.get("value").asText();
+
+                        URI objectType;
+                        String typeStr = objectField.get("type").asText();
+                        if (typeStr.equals("literal")) {
+                            objectType = KnownPrefixes.resolve(objectField.get("datatype").asText());
+                        } else if (typeStr.equals("uri")) {
+                            objectType = null;
+                        } else if (typeStr.equals("bnode")) {
+                            throw new MetadataRepositoryException("Bnodes not permitted in delta record");
+                        } else {
+                            throw new MetadataRepositoryException("Unknown object type in delta record: " + typeStr);
+                        }
+
+                        try {
+                            this.getRdfDao().insertRdfStatement(
+                                    resource, predicate, object, objectType, userEntityGraph);
+                        } catch (MetadataRepositoryException e) {
+                            String msg = String.format("Error inserting statement %s %s \"%s\"^^<%s> into %s",
+                                    resource, predicate, object, objectType, userEntityGraph);
+                            logger.warn(msg, e);
+                            return internalError(msg);
+                        }
+                    }
+                } catch (MetadataRepositoryException e) {
+                    String msg = String.format("Error deleting property from entity: %s", field);
+                    logger.warn(msg, e);
+                    return internalError(msg);
+                }
+            }
+        }
+
+        return noContent();
+    }
+
     private void validateRequiredToCreate(RdfDescription rdf, URI type)
             throws MetadataRepositoryException {
         QldarchOntology ont = this.getRdfDao().getOntology();
@@ -324,4 +438,5 @@ public class EntitySummaryResource {
         }
         return this.rdfDao;
     }
+
 }

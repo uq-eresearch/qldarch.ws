@@ -5,7 +5,9 @@ import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.*;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
@@ -48,6 +50,63 @@ public class RdfDataStoreDao {
 
                 conn.remove(resourceURI, null, null);
                 conn.remove((Resource)null, null, resourceURI);
+            }
+        });
+    }
+
+    public void deleteRdfStatement(final URI resource, final URI property, final String object, final URI objectType) throws MetadataRepositoryException {
+        this.getConnectionPool().performOperation(new RepositoryOperation() {
+            public void perform(RepositoryConnection conn)
+                    throws RepositoryException, MetadataRepositoryException {
+                URIImpl resourceURI = new URIImpl(resource.toString());
+                URIImpl propertyURI = new URIImpl(property.toString());
+                ValueFactory fac = new ValueFactoryImpl();
+                Value objectValue = (objectType == null) ? new URIImpl(object) : fac.createLiteral(object, fac.createURI(objectType.toString()));
+
+                conn.remove(resourceURI, propertyURI, objectValue);
+            }
+        });
+    }
+
+    public void deleteRdfStatement(final URI resource, final URI property, final String object, final URI objectType, final URI graph) throws MetadataRepositoryException {
+        this.getConnectionPool().performOperation(new RepositoryOperation() {
+            public void perform(RepositoryConnection conn)
+                    throws RepositoryException, MetadataRepositoryException {
+                if (graph == null) {
+                    throw new IllegalArgumentException("null graph passed to deleteRdfStatement");
+                }
+
+                URIImpl graphURI = new URIImpl(graph.toString());
+                if (!conn.hasStatement(null, null, null, true, graphURI)) {
+                    logger.debug("Attempt to delete statement ffrom non-existent graph: {} {} {}^^{} from {}", resource, property, object, objectType, graph);
+                    return;
+                }
+
+                URIImpl resourceURI = new URIImpl(resource.toString());
+                URIImpl propertyURI = new URIImpl(property.toString());
+                ValueFactory fac = new ValueFactoryImpl();
+                Value objectValue = (objectType == null) ? new URIImpl(object) : fac.createLiteral(object, fac.createURI(objectType.toString()));
+
+                conn.remove(resourceURI, propertyURI, objectValue, graphURI);
+            }
+        });
+    }
+
+    public void insertRdfStatement(final URI resource, final URI property, final String object, final URI objectType, final URI graph) throws MetadataRepositoryException {
+        this.getConnectionPool().performOperation(new RepositoryOperation() {
+            public void perform(RepositoryConnection conn)
+                    throws RepositoryException, MetadataRepositoryException {
+                if (graph == null) {
+                    throw new IllegalArgumentException("null graph passed to deleteRdfStatement");
+                }
+
+                URIImpl graphURI = new URIImpl(graph.toString());
+                URIImpl resourceURI = new URIImpl(resource.toString());
+                URIImpl propertyURI = new URIImpl(property.toString());
+                ValueFactory fac = new ValueFactoryImpl();
+                Value objectValue = (objectType == null) ? new URIImpl(object) : fac.createLiteral(object, fac.createURI(objectType.toString()));
+
+                conn.add(resourceURI, propertyURI, objectValue, graphURI);
             }
         });
     }
