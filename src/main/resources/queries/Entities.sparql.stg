@@ -7,7 +7,8 @@ PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
 select distinct ?s ?p ?o where  {
     {
         graph <http://qldarch.net/rdf/2013-09/catalog> {
-            ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g.
+            ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g1.
+            ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g2.
         }
     } UNION {
         BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g )
@@ -17,9 +18,11 @@ select distinct ?s ?p ?o where  {
         $if(incSupClass)$$withSuperClasses()$$endif$
         BIND ( ?type AS ?transType ) .
     } .
-    graph ?g {
+    graph ?g1 {
         ?s a ?transType .
-        ?s ?p ?o .
+    } .
+    graph ?g2 {
+            ?s ?p ?o .
     } .
     $if(summary)$$restrictToSummary()$$endif$
 } BINDINGS ?type { $types:usingBinding(); separator=" "$ }
