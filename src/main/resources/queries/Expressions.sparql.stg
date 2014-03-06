@@ -1,0 +1,19 @@
+delimiters "$", "$"
+
+confirmExpressionIds(ids) ::= <<
+PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?r  where {
+    {
+      graph <http://qldarch.net/rdf/2013-09/catalog> {
+        ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasExpressionGraph> ?g.
+      } .
+    } UNION {
+      BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) .
+    }
+    graph ?g {
+        ?e a ?t .
+        BIND (?e AS ?r) .
+    }
+} BINDINGS ?e { $ids:usingBinding(); separator=" "$ }
+>>
