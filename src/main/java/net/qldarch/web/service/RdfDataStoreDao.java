@@ -4,6 +4,7 @@ import net.qldarch.web.model.QldarchOntology;
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
@@ -42,6 +43,20 @@ public class RdfDataStoreDao {
         });
     }
 
+    public void updateRdfDescription(final RdfDescription rdf, final URI graph) throws MetadataRepositoryException {
+        this.getConnectionPool().performOperation(new RepositoryOperation() {
+            public void perform(RepositoryConnection conn)
+                    throws RepositoryException, MetadataRepositoryException {
+                URIImpl contextURI = new URIImpl(graph.toString());
+
+                for (Statement s : rdf.asStatements()) {
+                    conn.remove(s.getSubject(), s.getPredicate(), null, contextURI);
+                    conn.add(s.getSubject(), s.getPredicate(), s.getObject(), contextURI);
+                }
+            }
+        });
+    }
+    
     public void deleteRdfResource(final URI resource) throws MetadataRepositoryException {
         this.getConnectionPool().performOperation(new RepositoryOperation() {
             public void perform(RepositoryConnection conn)
