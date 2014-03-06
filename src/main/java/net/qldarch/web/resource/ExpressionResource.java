@@ -13,16 +13,20 @@ import com.google.common.collect.Multimap;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.stringtemplate.v4.STGroupFile;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.POST;
@@ -30,6 +34,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response.Status;
 
 import static com.google.common.base.Functions.toStringFunction;
 import static com.google.common.collect.Collections2.transform;
@@ -37,6 +42,9 @@ import static com.google.common.collect.Sets.newHashSet;
 import static javax.ws.rs.core.Response.Status;
 
 import static net.qldarch.web.service.KnownURIs.*;
+import static net.qldarch.web.util.ResourceUtils.badRequest;
+import static net.qldarch.web.util.ResourceUtils.forbidden;
+import static net.qldarch.web.util.ResourceUtils.internalError;
 
 /* FIXME: Consider refactor with EntitySummaryResource */
 
@@ -46,6 +54,8 @@ public class ExpressionResource {
 
     public static String USER_EXPRESSION_GRAPH_FORMAT = "http://qldarch.net/users/%s/expressions";
 
+    private static final STGroupFile EXPRESSION_QUERIES = new STGroupFile("queries/Expressions.sparql.stg");
+    
     private RdfDataStoreDao rdfDao;
 
     public static String queryByTypes(Collection<URI> types, boolean summary) {
@@ -284,7 +294,144 @@ public class ExpressionResource {
             .entity(entity)
             .build();
     }
+    
+    @DELETE
+    @Path("description")
+    @RequiresPermissions("delete:expression")
+    public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id,
+                                   @DefaultValue("") @QueryParam("IDLIST") String idlist) {
+        User user = User.currentUser();
 
+        if (user.isAnon()) {
+            return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Anonymous users are not permitted to delete entities")
+                    .build();
+        }
+
+        Set<String> idStrs = newHashSet(
+                Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
+        if (!id.isEmpty()) idStrs.add(id);
+
+        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+
+        List<URI> entityURIs = null;
+        try {
+            String query = EXPRESSION_QUERIES.getInstanceOf("confirmExpressionIds")
+                    .add("ids", idURIs)
+                    .render();
+
+            logger.debug("EntityResource DELETE evidence performing SPARQL id-query:\n{}", query);
+
+            entityURIs = this.getRdfDao().queryForRdfResources(query);
+        } catch (MetadataRepositoryException e) {
+            logger.warn("Error confirming entity ids: {})", idURIs);
+            return internalError("Error confirming entity ids");
+        }
+
+        if (entityURIs.isEmpty()) {
+            logger.info("Bad request received. No entity ids provided.");
+            return badRequest("QueryParam ID/IDLIST missing or invalid");
+        }
+
+        for (URI entity : entityURIs) {
+            try {
+                this.getRdfDao().deleteRdfResource(entity);
+            } catch (MetadataRepositoryException e) {
+                logger.warn("Error performing delete entity:{})", entity);
+                return internalError("Error performing delete");
+            }
+        }
+
+        return Response
+                .status(Status.ACCEPTED)
+                .type(MediaType.TEXT_PLAIN)
+                .entity(String.format("Entity %s deleted", id))
+                .build();
+    }
+
+    // FIXME: Refactor SesameConnectionPool to allow RdfDataStoreDao to offer user-delimited transactions
+    @PUT
+    @Path("description")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RequiresPermissions("create:expression")
+    public Response addEntity(@DefaultValue("") @QueryParam("ID") String id,
+                              String json) throws IOException {
+    	User user = User.currentUser();
+
+        if (user.isAnon()) {
+            return forbidden("Anonymous users are not permitted to update expression");
+        }
+
+        Set<String> idStrs = newHashSet();
+        if (!id.isEmpty()) {
+        	idStrs.add(id);
+        }
+
+        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        
+        List<URI> entityURIs = null;
+        try {
+        	String query = EXPRESSION_QUERIES.getInstanceOf("confirmExpressionIds")
+                    .add("ids", idURIs)
+                    .render();
+
+            logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
+
+            entityURIs = this.getRdfDao().queryForRdfResources(query);
+        } catch (MetadataRepositoryException e) {
+            logger.warn("Error confirming expression id: {})", id);
+            return internalError("Error confirming expression id");
+        }
+
+        if (entityURIs.isEmpty()) {
+            logger.info("Bad request received. No entity id provided.");
+            return badRequest("QueryParam ID missing or invalid");
+        }
+        
+        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
+
+        URI userEntityGraph = user.getEntityGraph();
+
+        // Check Entity type
+        List<URI> types = rdf.getType();
+        if (types.size() == 0) {
+            logger.info("Bad request received. No rdf:type provided: {}", rdf);
+            return badRequest("No rdf:type provided");
+        }
+        URI uri = null;
+        try {
+        	uri = new URI(id);
+        } catch (URISyntaxException em) {
+            logger.warn("Error performing passing id as URI:{})", id);
+            return internalError("Error performing update");
+        }
+        //-----------------------------------------------------------------------------------------
+        
+        for (URI entity : entityURIs) {
+        	try {
+	            URI type = types.get(0);
+	            validateRequiredToCreate(rdf, type);
+	
+	            rdf.setURI(entity);
+	            
+	            this.getRdfDao().updateRdfDescription(rdf, userEntityGraph);
+	        } catch (MetadataRepositoryException em) {
+	            logger.warn("Error performing updating graph:{}, rdf:{})", userEntityGraph, rdf, em);
+	            return internalError("Error performing insertRdfDescription");
+	        }
+	    }
+
+        String entity = new ObjectMapper().writeValueAsString(rdf);
+        logger.trace("Returning successful entity: {}", entity);
+
+        // Return
+        return Response.created(rdf.getURI())
+            .entity(entity)
+            .build();
+    }
+    
     private void validateRequiredToCreate(RdfDescription rdf, URI type)
             throws MetadataRepositoryException {
         QldarchOntology ont = this.getRdfDao().getOntology();

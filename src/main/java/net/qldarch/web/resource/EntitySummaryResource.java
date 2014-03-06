@@ -18,6 +18,7 @@ import org.stringtemplate.v4.STGroupFile;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
@@ -279,135 +280,78 @@ public class EntitySummaryResource {
     @RequiresPermissions("create:entity")
     public Response addEntity(@DefaultValue("") @QueryParam("ID") String id,
                               String json) throws IOException {
-        // Check User Authz
-        User user = User.currentUser();
+    	User user = User.currentUser();
 
         if (user.isAnon()) {
-            return Response
-                    .status(Status.FORBIDDEN)
-                    .type(MediaType.TEXT_PLAIN)
-                    .entity("Anonymous users are not permitted to create annotations")
-                    .build();
+            return forbidden("Anonymous users are not permitted to update annotations");
         }
 
-//        Use only for testing.
-//        User user = new User("admin");
-
-        if (id.isEmpty()) {
-            logger.info("Bad request received. No entity id provided.");
-            return badRequest("QueryParam ID missing");
+        Set<String> idStrs = newHashSet();
+        if (!id.isEmpty()) {
+        	idStrs.add(id);
         }
 
-        URI resource = null;
+        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        
+        List<URI> entityURIs = null;
         try {
-            resource = KnownPrefixes.resolve(id);
-
             String query = ENTITY_QUERIES.getInstanceOf("confirmEntityIds")
-                    .add("ids", singletonList(resource))
+                    .add("ids", idURIs)
                     .render();
 
-            logger.debug("EntityResource DELETE evidence performing SPARQL id-query:\n{}", query);
+            logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
 
-            List<URI> entityURIs = this.getRdfDao().queryForRdfResources(query);
-            if (entityURIs.isEmpty()) throw new MetadataRepositoryException("No entity with id " + resource + "found");
+            entityURIs = this.getRdfDao().queryForRdfResources(query);
         } catch (MetadataRepositoryException e) {
             logger.warn("Error confirming entity id: {})", id);
             return internalError("Error confirming entity id");
         }
 
-        JsonNode delta = new ObjectMapper().readTree(json);
-
-        if (!delta.isObject()) {
-            return badRequest("Delta object must be json object");
+        if (entityURIs.isEmpty()) {
+            logger.info("Bad request received. No entity id provided.");
+            return badRequest("QueryParam ID missing or invalid");
         }
-
-        if (delta.has("delete")) {
-            for (Map.Entry<String, JsonNode> field : asIterable(delta.get("delete").getFields())) {
-                try {
-                    URI predicate = KnownPrefixes.resolve(field.getKey());
-                    for (JsonNode objectField :
-                            field.getValue().isArray() ? field.getValue() : singletonList(field.getValue())) {
-                        if (!objectField.isObject()) {
-                            logger.warn("Delete structure contained invalid object: {}", objectField);
-                            return badRequest("Delete structure contained invalid object");
-                        }
-                        String object = objectField.get("value").asText();
-
-                        URI objectType;
-                        String typeStr = objectField.get("type").asText();
-                        if (typeStr.equals("literal")) {
-                            objectType = KnownPrefixes.resolve(objectField.get("datatype").asText());
-                        } else if (typeStr.equals("uri")) {
-                            objectType = null;
-                        } else if (typeStr.equals("bnode")) {
-                            throw new MetadataRepositoryException("Bnodes not permitted in delta record");
-                        } else {
-                            throw new MetadataRepositoryException("Unknown object type in delta record: " + typeStr);
-                        }
-
-                        try {
-                            this.getRdfDao().deleteRdfStatement(resource, predicate, object, objectType);
-                        } catch (MetadataRepositoryException e) {
-                            String msg = String.format("Error deleting statement %s %s \"%s\"^^<%s>",
-                                    resource, predicate, object, objectType);
-                            logger.warn(msg, e);
-                            return internalError(msg);
-
-                        }
-                    }
-                } catch (MetadataRepositoryException e) {
-                    String msg = String.format("Error deleting property from entity: {}", field);
-                    logger.warn(msg, e);
-                    return internalError(msg);
-                }
-            }
-        }
+        
+        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
         URI userEntityGraph = user.getEntityGraph();
 
-        if (delta.has("insert")) {
-            for (Map.Entry<String, JsonNode> field : asIterable(delta.get("insert").getFields())) {
-                try {
-                    URI predicate = KnownPrefixes.resolve(field.getKey());
-                    for (JsonNode objectField :
-                            field.getValue().isArray() ? field.getValue() : singletonList(field.getValue())) {
-                        if (!objectField.isObject()) {
-                            logger.warn("Insert structure contained invalid object: {}", objectField);
-                            return badRequest("Insert structure contained invalid object");
-                        }
-                        String object = objectField.get("value").asText();
-
-                        URI objectType;
-                        String typeStr = objectField.get("type").asText();
-                        if (typeStr.equals("literal")) {
-                            objectType = KnownPrefixes.resolve(objectField.get("datatype").asText());
-                        } else if (typeStr.equals("uri")) {
-                            objectType = null;
-                        } else if (typeStr.equals("bnode")) {
-                            throw new MetadataRepositoryException("Bnodes not permitted in delta record");
-                        } else {
-                            throw new MetadataRepositoryException("Unknown object type in delta record: " + typeStr);
-                        }
-
-                        try {
-                            this.getRdfDao().insertRdfStatement(
-                                    resource, predicate, object, objectType, userEntityGraph);
-                        } catch (MetadataRepositoryException e) {
-                            String msg = String.format("Error inserting statement %s %s \"%s\"^^<%s> into %s",
-                                    resource, predicate, object, objectType, userEntityGraph);
-                            logger.warn(msg, e);
-                            return internalError(msg);
-                        }
-                    }
-                } catch (MetadataRepositoryException e) {
-                    String msg = String.format("Error deleting property from entity: %s", field);
-                    logger.warn(msg, e);
-                    return internalError(msg);
-                }
-            }
+        // Check Entity type
+        List<URI> types = rdf.getType();
+        if (types.size() == 0) {
+            logger.info("Bad request received. No rdf:type provided: {}", rdf);
+            return badRequest("No rdf:type provided");
         }
+        URI uri = null;
+        try {
+        	uri = new URI(id);
+        } catch (URISyntaxException em) {
+            logger.warn("Error performing passing id as URI:{})", id);
+            return internalError("Error performing update");
+        }
+        //-----------------------------------------------------------------------------------------
+        
+        for (URI entity : entityURIs) {
+        	try {
+	            URI type = types.get(0);
+	            validateRequiredToCreate(rdf, type);
+	
+	            rdf.setURI(entity);
+	            
+	            this.getRdfDao().updateRdfDescription(rdf, userEntityGraph);
+	        } catch (MetadataRepositoryException em) {
+	            logger.warn("Error performing updating graph:{}, rdf:{})", userEntityGraph, rdf, em);
+	            return internalError("Error performing insertRdfDescription");
+	        }
+	    }
 
-        return noContent();
+        String entity = new ObjectMapper().writeValueAsString(rdf);
+        logger.trace("Returning successful entity: {}", entity);
+
+        // Return
+        return Response.created(rdf.getURI())
+            .entity(entity)
+            .build();
     }
 
     private void validateRequiredToCreate(RdfDescription rdf, URI type)
