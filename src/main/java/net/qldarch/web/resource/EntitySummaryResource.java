@@ -15,6 +15,7 @@ import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.stringtemplate.v4.STGroupFile;
+import org.openrdf.model.Statement;
 
 import java.io.IOException;
 import java.net.URI;
@@ -312,10 +313,27 @@ public class EntitySummaryResource {
             return badRequest("QueryParam ID missing or invalid");
         }
         
+        List<URI> graphURIs = null;
+        try {
+            String query = ENTITY_QUERIES.getInstanceOf("extractGraphContext")
+                    .add("ids", idURIs)
+                    .render();
+
+            logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
+
+            graphURIs = this.getRdfDao().queryForRdfResources(query);
+        } catch (MetadataRepositoryException e) {
+            logger.warn("Error extracting graph from entity id: {})", id);
+            return internalError("Error extracting graph from entity id");
+        }
+
+        if (graphURIs.isEmpty()) {
+            logger.info("Bad request received. No graph identified from entity id provided.");
+            return badRequest("No graph identified from entity id provided");
+        }
+        
         RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
-
-        URI userEntityGraph = user.getEntityGraph();
-
+                
         // Check Entity type
         List<URI> types = rdf.getType();
         if (types.size() == 0) {
@@ -329,7 +347,6 @@ public class EntitySummaryResource {
             logger.warn("Error performing passing id as URI:{})", id);
             return internalError("Error performing update");
         }
-        //-----------------------------------------------------------------------------------------
         
         for (URI entity : entityURIs) {
         	try {
@@ -338,9 +355,9 @@ public class EntitySummaryResource {
 	
 	            rdf.setURI(entity);
 	            
-	            this.getRdfDao().updateRdfDescription(rdf, userEntityGraph);
+	            this.getRdfDao().updateRdfDescription(rdf, graphURIs.get(0));
 	        } catch (MetadataRepositoryException em) {
-	            logger.warn("Error performing updating graph:{}, rdf:{})", userEntityGraph, rdf, em);
+	            logger.warn("Error performing updating graph:{}, rdf:{})", graphURIs.get(0), rdf, em);
 	            return internalError("Error performing insertRdfDescription");
 	        }
 	    }

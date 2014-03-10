@@ -51,6 +51,8 @@ public class RdfDataStoreDao {
 
                 for (Statement s : rdf.asStatements()) {
                     conn.remove(s.getSubject(), s.getPredicate(), null, contextURI);
+                }
+                for (Statement s : rdf.asStatements()) {
                     conn.add(s.getSubject(), s.getPredicate(), s.getObject(), contextURI);
                 }
             }
