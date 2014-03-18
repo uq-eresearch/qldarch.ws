@@ -17,6 +17,7 @@ public class User {
 
     public static String USER_REFERENCE_GRAPH_FORMAT = "http://qldarch.net/users/%s/references";
     public static String USER_ANNOTATION_GRAPH_FORMAT = "http://qldarch.net/users/%s/annotations";
+    public static String USER_TIMELINE_GRAPH_FORMAT = "http://qldarch.net/users/%s/timelines";
     public static String USER_ENTITY_GRAPH_FORMAT = "http://qldarch.net/users/%s/entities";
     public static String USER_VOCABULARY_GRAPH_FORMAT = "http://qldarch.net/users/%s/vocabulary";
     public static String USER_EXPRESSION_GRAPH_FORMAT = "http://qldarch.net/users/%s/expressions";
@@ -55,6 +56,10 @@ public class User {
 
     public URI getAnnotationGraph() {
         return URI.create(String.format(USER_ANNOTATION_GRAPH_FORMAT, username));
+    }
+
+    public URI getTimelineGraph() {
+        return URI.create(String.format(USER_TIMELINE_GRAPH_FORMAT, username));
     }
 
     public URI getEntityGraph() {

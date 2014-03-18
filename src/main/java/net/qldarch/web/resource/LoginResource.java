@@ -1,5 +1,10 @@
 package net.qldarch.web.resource;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.Path;
@@ -33,6 +38,32 @@ public class LoginResource {
         if (principal != null) {
             on.put("user", principal.toString());
             on.put("auth", true);
+            
+            Connection connection = null;
+    		Statement stmt = null;
+    		try
+            {
+    			Class.forName("com.mysql.jdbc.Driver");
+                connection = DriverManager
+                    .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
+    			
+                stmt = connection.createStatement();
+    	    	ResultSet rs = stmt.executeQuery("SELECT email FROM users WHERE username = '" + principal.toString() + "'");
+    	    	while (rs.next()) {
+    	    		String email = rs.getString("email");
+    	            on.put("email", email);
+    	    	}
+    	    	rs.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    stmt.close();
+                    connection.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
         } else {
             on.put("user", "");
             on.put("auth", false);
@@ -60,6 +91,32 @@ public class LoginResource {
                 on.put("user", username);
                 on.put("auth", true);
 
+                Connection connection = null;
+        		Statement stmt = null;
+        		try
+                {
+        			Class.forName("com.mysql.jdbc.Driver");
+                    connection = DriverManager
+                        .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
+        			
+                    stmt = connection.createStatement();
+        	    	ResultSet rs = stmt.executeQuery("SELECT email FROM users WHERE username = '" + username + "'");
+        	    	while (rs.next()) {
+        	    		String email = rs.getString("email");
+        	            on.put("email", email);
+        	    	}
+        	    	rs.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    try {
+                        stmt.close();
+                        connection.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+                
                 return Response.ok()
                     .entity(on.toString())
                     .build();

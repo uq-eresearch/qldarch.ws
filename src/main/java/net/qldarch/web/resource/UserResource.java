@@ -197,6 +197,7 @@ public class UserResource {
 
             on.put("user", username);
             on.put("auth", true);
+            on.put("email", email);
 
             return Response.ok()
                 .entity(on.toString())
