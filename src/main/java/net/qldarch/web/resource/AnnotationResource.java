@@ -9,6 +9,7 @@ import net.qldarch.web.service.RdfDataStoreDao;
 import net.qldarch.web.util.Functions;
 import net.qldarch.web.util.SparqlToJsonString;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -239,20 +240,18 @@ public class AnnotationResource {
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:annotation")
     public Response addAnnotation(String json) throws IOException {
+        if (!SecurityUtils.getSubject().isPermitted("annotation:create")) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
+        }
+        
         RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
-        // Check User Auth
         User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return Response
-                .status(Status.FORBIDDEN)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Anonymous users are not permitted to create annotations")
-                .build();
-        }
 
         URI userAnnotationGraph = user.getAnnotationGraph();
 
@@ -315,16 +314,15 @@ public class AnnotationResource {
 
     @DELETE
     @Path("evidence")
-    @RequiresPermissions("delete:annotation")
     public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id,
                                    @DefaultValue("") @QueryParam("IDLIST") String idlist) {
         User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return Response
+        if (!SecurityUtils.getSubject().isPermitted("annotation:delete")
+        		&& !user.isOwner(id)) {
+        	return Response
                     .status(Status.FORBIDDEN)
                     .type(MediaType.TEXT_PLAIN)
-                    .entity("Anonymous users are not permitted to delete annotations")
+                    .entity("Permission Denied.")
                     .build();
         }
 

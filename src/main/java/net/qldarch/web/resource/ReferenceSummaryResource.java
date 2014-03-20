@@ -6,6 +6,7 @@ import net.qldarch.web.service.MetadataRepositoryException;
 import net.qldarch.web.service.RdfDataStoreDao;
 import net.qldarch.web.util.SparqlToJsonString;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response.Status;
 
 import static com.google.common.collect.Sets.newHashSet;
 import static javax.ws.rs.core.Response.Status;
@@ -145,20 +147,17 @@ public class ReferenceSummaryResource {
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:annotation")
     public Response addReference(String json) throws IOException, MetadataRepositoryException {
-        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
-
-        // Check User Authz
-        User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return Response
-                .status(Status.FORBIDDEN)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Anonymous users are not permitted to create annotations")
-                .build();
+        if (!SecurityUtils.getSubject().isPermitted("annotation:create")) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
         }
+        
+        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
+        User user = User.currentUser();
 
         // Check Reference type
         List<URI> types = rdf.getType();

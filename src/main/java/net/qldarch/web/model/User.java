@@ -2,6 +2,8 @@ package net.qldarch.web.model;
 
 import net.qldarch.web.service.KnownPrefixes;
 import net.qldarch.web.service.MetadataRepositoryException;
+import net.qldarch.web.util.SparqlToString;
+
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
@@ -9,6 +11,10 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.GregorianCalendar;
 import java.util.Random;
 
@@ -17,7 +23,7 @@ public class User {
 
     public static String USER_REFERENCE_GRAPH_FORMAT = "http://qldarch.net/users/%s/references";
     public static String USER_ANNOTATION_GRAPH_FORMAT = "http://qldarch.net/users/%s/annotations";
-    public static String USER_TIMELINE_GRAPH_FORMAT = "http://qldarch.net/users/%s/timelines";
+    public static String USER_COMPOUND_OBJECT_GRAPH_FORMAT = "http://qldarch.net/users/%s/compoundObjects";
     public static String USER_ENTITY_GRAPH_FORMAT = "http://qldarch.net/users/%s/entities";
     public static String USER_VOCABULARY_GRAPH_FORMAT = "http://qldarch.net/users/%s/vocabulary";
     public static String USER_EXPRESSION_GRAPH_FORMAT = "http://qldarch.net/users/%s/expressions";
@@ -25,10 +31,10 @@ public class User {
     public static String USER_URI_FORMAT = "http://qldarch.net/users/%s";
 
     private String username;
-
+    
     // FIXME: Made public scope to allow testing.
     public User(String username) {
-        this.username = Validators.username(username);
+        this.username = username;
     }
 
     public static User currentUser() {
@@ -38,6 +44,30 @@ public class User {
         return new User(username);
     }
 
+    public boolean isOwner(String id) {
+    	String result = new SparqlToString().performQuery(getResourceGraph(id));
+    	if (result.startsWith(String.format(USER_URI_FORMAT, id))) {
+    		return true;
+    	}
+    	return false;
+    }
+    
+    private static String getResourceGraph(String id) {
+        String query = new StringBuilder(
+                "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
+                "select distinct ?r " +
+                "where {" +
+                "  GRAPH ?r {" +
+                "    BIND ( <" + id + "> AS ?s ) ." + 
+                "    ?s ?p ?o." +
+                "  }" +
+                "}").toString();
+
+        logger.debug("CompoundObject performing SPARQL query: {}", query);
+        
+        return query;
+    }
+    
     public boolean isAnon() {
         return username == null || username.isEmpty();
     }
@@ -58,8 +88,8 @@ public class User {
         return URI.create(String.format(USER_ANNOTATION_GRAPH_FORMAT, username));
     }
 
-    public URI getTimelineGraph() {
-        return URI.create(String.format(USER_TIMELINE_GRAPH_FORMAT, username));
+    public URI getCompoundObjectGraph() {
+        return URI.create(String.format(USER_COMPOUND_OBJECT_GRAPH_FORMAT, username));
     }
 
     public URI getEntityGraph() {

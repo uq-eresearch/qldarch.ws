@@ -11,6 +11,8 @@ import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Multimap;
+
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +26,7 @@ import java.util.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response.Status;
 
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
@@ -146,17 +149,18 @@ public class EntitySummaryResource {
     @POST
     @Path("description")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:entity")
     public Response addEntity(String json) throws IOException {
+        if (!SecurityUtils.getSubject().isPermitted("entity:create")) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
+        }
+        
         RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
-        // Check User Authz
         User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return forbidden("Anonymous users are not permitted to create annotations");
-        }
-
         URI userEntityGraph = user.getEntityGraph();
 
         // Check Entity type
@@ -219,16 +223,16 @@ public class EntitySummaryResource {
 
     @DELETE
     @Path("description")
-    @RequiresPermissions("delete:entity")
     public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id,
                                    @DefaultValue("") @QueryParam("IDLIST") String idlist) {
         User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return Response
+        
+        if (!SecurityUtils.getSubject().isPermitted("entity:delete")
+        		&& !user.isOwner(id)) {
+        	return Response
                     .status(Status.FORBIDDEN)
                     .type(MediaType.TEXT_PLAIN)
-                    .entity("Anonymous users are not permitted to delete entities")
+                    .entity("Permission Denied.")
                     .build();
         }
 
@@ -278,13 +282,17 @@ public class EntitySummaryResource {
     @PUT
     @Path("description")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:entity")
     public Response addEntity(@DefaultValue("") @QueryParam("ID") String id,
                               String json) throws IOException {
     	User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return forbidden("Anonymous users are not permitted to update annotations");
+    	
+        if (!SecurityUtils.getSubject().isPermitted("entity:update")
+        		&& !user.isOwner(id)) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
         }
 
         Set<String> idStrs = newHashSet();

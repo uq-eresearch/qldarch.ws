@@ -10,6 +10,8 @@ import org.codehaus.jackson.map.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Multimap;
+
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -206,21 +208,17 @@ public class ExpressionResource {
     @POST
     @Path("description")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:expression")
     public Response addExpression(String json) throws IOException {
-        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
-
-        // Check User Authz
-        User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return Response
-                .status(Status.FORBIDDEN)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Anonymous users are not permitted to create annotations")
-                .build();
+        if (!SecurityUtils.getSubject().isPermitted("expression:create")) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
         }
-
+        
+        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
+        User user = User.currentUser();
         URI userExpressionGraph = user.getExpressionGraph();
 
         // Check Expression type
@@ -297,16 +295,16 @@ public class ExpressionResource {
     
     @DELETE
     @Path("description")
-    @RequiresPermissions("delete:expression")
     public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id,
                                    @DefaultValue("") @QueryParam("IDLIST") String idlist) {
         User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return Response
+        
+        if (!SecurityUtils.getSubject().isPermitted("expression:delete")
+        		&& !user.isOwner(id)) {
+        	return Response
                     .status(Status.FORBIDDEN)
                     .type(MediaType.TEXT_PLAIN)
-                    .entity("Anonymous users are not permitted to delete entities")
+                    .entity("Permission Denied.")
                     .build();
         }
 
@@ -355,15 +353,19 @@ public class ExpressionResource {
     @PUT
     @Path("description")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:expression")
     public Response addEntity(@DefaultValue("") @QueryParam("ID") String id,
                               String json) throws IOException {
     	User user = User.currentUser();
-
-        if (user.isAnon()) {
-            return forbidden("Anonymous users are not permitted to update expression");
+    	
+        if (!SecurityUtils.getSubject().isPermitted("expression:update")
+        		&& !user.isOwner(id)) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
         }
-
+        
         Set<String> idStrs = newHashSet();
         if (!id.isEmpty()) {
         	idStrs.add(id);

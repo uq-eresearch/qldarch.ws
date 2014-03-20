@@ -17,8 +17,8 @@ public interface KnownURIs {
         URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasExpressionGraph");
     public static final URI QAC_HAS_FILE_GRAPH = 
         URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasFileGraph");
-    public static final URI QAC_HAS_TIMELINE_GRAPH = 
-            URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasTimelineGraph");
+    public static final URI QAC_HAS_COMPOUND_OBJECT_GRAPH = 
+            URI.create("http://qldarch.net/ns/rdf/2013-09/catalog#hasCompoundObjectGraph");
     public static final URI QAC_CATALOG_GRAPH = 
         URI.create("http://qldarch.net/rdf/2013-09/catalog");
 

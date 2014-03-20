@@ -8,6 +8,7 @@ import net.qldarch.web.util.SparqlToJsonString;
 import net.qldarch.web.util.SparqlToString;
 
 import org.codehaus.jackson.map.ObjectMapper;
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,12 +22,12 @@ import javax.ws.rs.core.Response.Status;
 
 import static net.qldarch.web.service.KnownURIs.*;
 
-@Path("/timeline")
-public class TimelineResource {
-    public static Logger logger = LoggerFactory.getLogger(TimelineResource.class);
+@Path("/compoundObject")
+public class CompoundObjectResource {
+    public static Logger logger = LoggerFactory.getLogger(CompoundObjectResource.class);
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
 
-    public static String SHARED_TIMELINE_GRAPH = "http://qldarch.net/rdf/2013-09/timelines";
+    public static String SHARED_COMPOUND_OBJECT_GRAPH = "http://qldarch.net/rdf/2013-09/compoundObjects";
 
     private RdfDataStoreDao rdfDao;
 
@@ -44,12 +45,10 @@ public class TimelineResource {
                 .build();
         }
 
-        logger.debug("Querying timelines for resource: {}", id);
+        logger.debug("Querying compound objects for: {}", id);
      
         String result = new SparqlToString().performQuery(
         		formatQuery(id));
-        // Remove leading and end quote
-        result = result.substring(1, result.length()-1);
         
         return Response.ok()
             .entity(result)
@@ -65,7 +64,7 @@ public class TimelineResource {
                 "  ?s <http://qldarch.net/ns/rdf/2012-06/terms#jsonData> ?r." +
                 "}").toString();
 
-        logger.debug("TimelineResource performing SPARQL query: {}", query);
+        logger.debug("CompoundObject performing SPARQL query: {}", query);
         
         return query;
     }
@@ -85,7 +84,7 @@ public class TimelineResource {
                 .build();
         }
 
-        logger.debug("Querying timelines from user: {}", username);
+        logger.debug("Querying for compound objects from user: {}", username);
      
         String result = new SparqlToJsonString().performQuery(formatQueryFromUser(username));
         
@@ -101,14 +100,14 @@ public class TimelineResource {
                 "where {" +
                 "  {" + 
                 "    BIND ( <http://qldarch.net/users/" + username + "> AS ?user ) ." + 
-                "    ?user <http://qldarch.net/ns/rdf/2013-09/catalog#hasTimelineGraph> ?g." +
+                "    ?user <http://qldarch.net/ns/rdf/2013-09/catalog#hasCompoundObjectGraph> ?g." +
                 "  }" +
                 "  GRAPH ?g {" +
                 "    ?s ?p ?o." +
                 "  }" + 
                 "}").toString();
 
-        logger.debug("TimelineResource performing SPARQL query: {}", query);
+        logger.debug("CompoundObjectResource performing SPARQL query: {}", query);
         
         return query;
     }
@@ -116,42 +115,42 @@ public class TimelineResource {
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    @RequiresPermissions("create:timeline")
-    public Response addTimeline(String json) throws IOException {
-        // Check User Auth
+    public Response addCompoundObject(String json,
+            @DefaultValue("http://qldarch.net/ns/rdf/2012-06/terms#CompoundObject") 
+    			@QueryParam("type") String type) throws IOException {
+        if (!SecurityUtils.getSubject().isPermitted("compoundObject:create")) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
+        }
+    	
         User user = User.currentUser();
 
-        if (user.isAnon()) {
-            return Response
-                .status(Status.FORBIDDEN)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Anonymous users are not permitted to create timelines")
-                .build();
-        }
-
-        URI userTimelineGraph = user.getTimelineGraph();
+        URI userCompoundObjectGraph = user.getCompoundObjectGraph();
         RdfDescription rdf = new RdfDescription();
         
         try {
-        	URI type = new URI("http://qldarch.net/ns/rdf/2012-06/terms#Timeline");
+        	URI typeURI = new URI(type);
         	
-            URI relId = user.newId(userTimelineGraph, type);
+            URI relId = user.newId(userCompoundObjectGraph, typeURI);
 
             rdf.setURI(relId);
-            rdf.addProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#type", type);
+            rdf.addProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#type", typeURI);
             rdf.addProperty("qldarch:jsonData", json);
             
             // Generate and Perform insertRdfDescription query
-            this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_TIMELINE_GRAPH, userTimelineGraph);
+            this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_COMPOUND_OBJECT_GRAPH, userCompoundObjectGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insertTimeline rdf:{})", rdf, em);
+            logger.warn("Error performing insertCompoundObject rdf:{})", rdf, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
                 .entity("Error performing insertRdfDescription")
                 .build();
         } catch (URISyntaxException em) {
-            logger.warn("Error performing insertTimeline rdf:{})", rdf, em);
+            logger.warn("Error performing insertCompoundObject rdf:{})", rdf, em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
@@ -159,17 +158,26 @@ public class TimelineResource {
                 .build();
 		}
 
-        String timeline = new ObjectMapper().writeValueAsString(rdf);
-        logger.trace("Returning successful timeline: {}", timeline);
+        String compoundObject = new ObjectMapper().writeValueAsString(rdf);
+        logger.trace("Returning successful compoundObject: {}", compoundObject);
         // Return
         return Response.created(rdf.getURI())
-            .entity(timeline)
+            .entity(compoundObject)
             .build();
     }
     
     @DELETE
-    @RequiresPermissions("delete:timeline")
-    public Response deleteEvidence(@DefaultValue("") @QueryParam("ID") String id) {
+    public Response deleteCompoundObject(@DefaultValue("") @QueryParam("ID") String id) {
+    	User user = User.currentUser();
+    	if (!SecurityUtils.getSubject().isPermitted("compoundObject:delete")
+        		&& !user.isOwner(id)) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
+        }
+        
     	try {
 			this.getRdfDao().deleteRdfResource(new URI(id));
 		} catch (MetadataRepositoryException e) {
@@ -191,7 +199,55 @@ public class TimelineResource {
         return Response
             .status(Status.ACCEPTED)
             .type(MediaType.TEXT_PLAIN)
-            .entity(String.format("Timeline %s deleted", id))
+            .entity(String.format("CompoundObject %s deleted", id))
+            .build();
+    }
+    
+    @PUT
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response updateCompoundObject(@DefaultValue("") @QueryParam("ID") String id,
+                              String json) throws IOException {
+        User user = User.currentUser();
+        
+        if (!SecurityUtils.getSubject().isPermitted("compoundObject:update")
+        		&& !user.isOwner(id)) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
+        }
+        
+        URI userCompoundObjectGraph = user.getCompoundObjectGraph();
+        RdfDescription rdf = new RdfDescription();
+        
+        try {        	
+            rdf.setURI(new URI(id));
+            rdf.addProperty("qldarch:jsonData", json);
+            
+            // Generate and Perform insertRdfDescription query
+            this.getRdfDao().updateRdfDescription(rdf, userCompoundObjectGraph);
+        } catch (MetadataRepositoryException em) {
+            logger.warn("Error performing updateCompoundObject rdf:{})", rdf, em);
+            return Response
+                .status(Status.INTERNAL_SERVER_ERROR)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("Error performing insertRdfDescription")
+                .build();
+        } catch (URISyntaxException em) {
+            logger.warn("Error performing updateCompoundObject rdf:{})", rdf, em);
+            return Response
+                .status(Status.INTERNAL_SERVER_ERROR)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("Error performing insertRdfDescription")
+                .build();
+		}
+
+        String compoundObject = new ObjectMapper().writeValueAsString(rdf);
+        logger.trace("Returning successful compoundObject: {}", compoundObject);
+        // Return
+        return Response.created(rdf.getURI())
+            .entity(compoundObject)
             .build();
     }
     
