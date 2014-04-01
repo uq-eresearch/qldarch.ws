@@ -48,10 +48,15 @@ public class LoginResource {
                     .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
     			
                 stmt = connection.createStatement();
-    	    	ResultSet rs = stmt.executeQuery("SELECT email FROM users WHERE username = '" + principal.toString() + "'");
+    	    	ResultSet rs = stmt.executeQuery(
+    	    			"SELECT users.email, user_roles.role_name " +
+                        "FROM users, user_roles " +
+                        "WHERE users.username = \'" + principal.toString() + "\' " +
+                        "AND user_roles.username = users.username;"
+    	    	);
     	    	while (rs.next()) {
-    	    		String email = rs.getString("email");
-    	            on.put("email", email);
+    	            on.put("email", rs.getString("email"));
+    	            on.put("role", rs.getString("role_name"));
     	    	}
     	    	rs.close();
             } catch (Exception e) {
@@ -86,7 +91,6 @@ public class LoginResource {
                 token.setRememberMe(false);
                 Subject currentUser = SecurityUtils.getSubject();
                 currentUser.login(token);
-                logger.trace("Successful authentication for {}", username);
 
                 on.put("user", username);
                 on.put("auth", true);
@@ -100,10 +104,15 @@ public class LoginResource {
                         .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
         			
                     stmt = connection.createStatement();
-        	    	ResultSet rs = stmt.executeQuery("SELECT email FROM users WHERE username = '" + username + "'");
+                    ResultSet rs = stmt.executeQuery(
+        	    			"SELECT users.email, user_roles.role_name " +
+                            "FROM users, user_roles " +
+                            "WHERE users.username = \'" + username + "\' " +
+                            "AND user_roles.username = users.username;"
+        	    	);
         	    	while (rs.next()) {
-        	    		String email = rs.getString("email");
-        	            on.put("email", email);
+        	            on.put("email", rs.getString("email"));
+        	            on.put("role", rs.getString("role_name"));
         	    	}
         	    	rs.close();
                 } catch (Exception e) {
@@ -117,9 +126,18 @@ public class LoginResource {
                     }
                 }
                 
-                return Response.ok()
-                    .entity(on.toString())
-                    .build();
+    	    	if (on.get("role").toString().contains(UserResource.ROLE_DISABLED)) {
+                    logger.trace("Authentication for {} failed. Account disabled.", username);
+        	    	currentUser.logout();
+        	        return Response.status(Response.Status.FORBIDDEN)
+        	            .entity("Account " + username + " disabled.")
+        	            .build();
+    	    	} else {
+                    logger.trace("Successful authentication for {}", username);
+    	    		return Response.ok()
+    	    				.entity(on.toString())
+    	    				.build();
+    	    	}
             }
         } catch (AuthenticationException ea) {
             logger.debug("Failed authentication for {}", username);
@@ -127,6 +145,8 @@ public class LoginResource {
 
         on.put("user", "");
         on.put("auth", false);
+        on.put("email", "");
+        on.put("role", "");
         return Response.status(Response.Status.FORBIDDEN)
             .entity(on.toString())
             .build();

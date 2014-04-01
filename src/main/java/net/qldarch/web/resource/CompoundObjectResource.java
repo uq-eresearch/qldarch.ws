@@ -9,7 +9,6 @@ import net.qldarch.web.util.SparqlToString;
 
 import org.codehaus.jackson.map.ObjectMapper;
 import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -33,6 +32,37 @@ public class CompoundObjectResource {
 
     @GET
     @Produces("application/json")
+    public Response performGet() {
+        logger.debug("Querying for compound objects: {}");
+     
+        String result = new SparqlToJsonString().performQuery(formatQuery());
+        
+        return Response.ok()
+            .entity(result)
+            .build();
+    }
+    
+    public static String formatQuery() {
+        String query = new StringBuilder(
+                "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
+                "select distinct ?s ?p ?o " +
+                "where {" +
+                "  {" + 
+                "    ?user <http://qldarch.net/ns/rdf/2013-09/catalog#hasCompoundObjectGraph> ?g." +
+                "  }" +
+                "  GRAPH ?g {" +
+                "    ?s ?p ?o." +
+                "  }" + 
+                "}").toString();
+
+        logger.debug("CompoundObjectResource performing SPARQL query: {}", query);
+        
+        return query;
+    }
+    
+    @GET
+    @Path("id")
+    @Produces("application/json")
     public Response performGet(
             @DefaultValue("") @QueryParam("ID") String id) {
 
@@ -48,14 +78,14 @@ public class CompoundObjectResource {
         logger.debug("Querying compound objects for: {}", id);
      
         String result = new SparqlToString().performQuery(
-        		formatQuery(id));
+        		formatQueryById(id));
         
         return Response.ok()
             .entity(result)
             .build();
     }
     
-    public static String formatQuery(String id) {
+    public static String formatQueryById(String id) {
         String query = new StringBuilder(
                 "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
                 "select distinct ?r " +
@@ -108,6 +138,74 @@ public class CompoundObjectResource {
                 "}").toString();
 
         logger.debug("CompoundObjectResource performing SPARQL query: {}", query);
+        
+        return query;
+    }
+        
+    @PUT
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response updateCompoundObject(@DefaultValue("") @QueryParam("ID") String id,
+                              String json) throws IOException {
+        User user = User.currentUser();
+        
+        if (!SecurityUtils.getSubject().isPermitted("compoundObject:update")
+        		&& !user.isOwner(id)) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
+        }
+        
+        URI userCompoundObjectGraph = user.getCompoundObjectGraph();
+        RdfDescription rdf = new RdfDescription();
+        
+        try {        	
+            rdf.setURI(new URI(id));
+            rdf.addProperty("qldarch:jsonData", json);
+            
+            // Generate and Perform insertRdfDescription query
+            this.getRdfDao().updateRdfDescription(rdf, userCompoundObjectGraph);
+            
+            String type = new SparqlToString().performQuery(
+            		formatQueryTypeById(id));
+            rdf.addProperty("http://www.w3.org/1999/02/22-rdf-syntax-ns#type", type);
+        } catch (MetadataRepositoryException em) {
+            logger.warn("Error performing updateCompoundObject rdf:{})", rdf, em);
+            return Response
+                .status(Status.INTERNAL_SERVER_ERROR)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("Error performing insertRdfDescription")
+                .build();
+        } catch (URISyntaxException em) {
+            logger.warn("Error performing updateCompoundObject rdf:{})", rdf, em);
+            return Response
+                .status(Status.INTERNAL_SERVER_ERROR)
+                .type(MediaType.TEXT_PLAIN)
+                .entity("Error performing insertRdfDescription")
+                .build();
+		}
+        
+        String compoundObject = new ObjectMapper().writeValueAsString(rdf);
+        
+        logger.trace("Returning successful compoundObject: {}", compoundObject);
+        // Return
+        return Response.created(rdf.getURI())
+            .entity(compoundObject)
+            .build();
+    }
+    
+    public static String formatQueryTypeById(String id) {
+    	String query = new StringBuilder(
+                "PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#> " +
+                "select distinct ?r " +
+                "where {" + 
+                "  BIND ( <" + id + "> AS ?s ) ." + 
+                "  ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?r." +
+                "}").toString();
+
+        logger.debug("CompoundObject performing SPARQL query: {}", query);
         
         return query;
     }
@@ -200,54 +298,6 @@ public class CompoundObjectResource {
             .status(Status.ACCEPTED)
             .type(MediaType.TEXT_PLAIN)
             .entity(String.format("CompoundObject %s deleted", id))
-            .build();
-    }
-    
-    @PUT
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response updateCompoundObject(@DefaultValue("") @QueryParam("ID") String id,
-                              String json) throws IOException {
-        User user = User.currentUser();
-        
-        if (!SecurityUtils.getSubject().isPermitted("compoundObject:update")
-        		&& !user.isOwner(id)) {
-        	return Response
-                    .status(Status.FORBIDDEN)
-                    .type(MediaType.TEXT_PLAIN)
-                    .entity("Permission Denied.")
-                    .build();
-        }
-        
-        URI userCompoundObjectGraph = user.getCompoundObjectGraph();
-        RdfDescription rdf = new RdfDescription();
-        
-        try {        	
-            rdf.setURI(new URI(id));
-            rdf.addProperty("qldarch:jsonData", json);
-            
-            // Generate and Perform insertRdfDescription query
-            this.getRdfDao().updateRdfDescription(rdf, userCompoundObjectGraph);
-        } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing updateCompoundObject rdf:{})", rdf, em);
-            return Response
-                .status(Status.INTERNAL_SERVER_ERROR)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Error performing insertRdfDescription")
-                .build();
-        } catch (URISyntaxException em) {
-            logger.warn("Error performing updateCompoundObject rdf:{})", rdf, em);
-            return Response
-                .status(Status.INTERNAL_SERVER_ERROR)
-                .type(MediaType.TEXT_PLAIN)
-                .entity("Error performing insertRdfDescription")
-                .build();
-		}
-
-        String compoundObject = new ObjectMapper().writeValueAsString(rdf);
-        logger.trace("Returning successful compoundObject: {}", compoundObject);
-        // Return
-        return Response.created(rdf.getURI())
-            .entity(compoundObject)
             .build();
     }
     

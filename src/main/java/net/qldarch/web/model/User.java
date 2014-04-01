@@ -46,7 +46,7 @@ public class User {
 
     public boolean isOwner(String id) {
     	String result = new SparqlToString().performQuery(getResourceGraph(id));
-    	if (result.startsWith(String.format(USER_URI_FORMAT, id))) {
+    	if (result.startsWith(String.format(USER_URI_FORMAT, username))) {
     		return true;
     	}
     	return false;
