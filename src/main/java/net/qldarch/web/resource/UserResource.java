@@ -6,7 +6,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Properties;
+import java.util.Random;
 
+import javax.mail.*;
+import javax.mail.internet.*;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.FormParam;
@@ -47,6 +51,9 @@ public class UserResource {
     public static final String ROLE_EDITOR = "editor";
     public static final String ROLE_ROOT = "root";
 
+    private String AB = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	private Random rnd = new Random();
+    
     @GET
     @Produces("application/json")
     public Response getAllUsers() {
@@ -299,6 +306,80 @@ public class UserResource {
         }
     }
     
+    @GET
+    @Path("activation")
+    @Produces("text/html")
+    public Response getAllUsers(
+    		@DefaultValue("") @QueryParam("code") String confirmationString) {
+    	if (confirmationString.isEmpty()) {
+            return Response.status(Response.Status.NOT_ACCEPTABLE)
+            		.entity("Invalid or Expired code given.").build();
+    	}
+    	Connection connection = null;
+		Statement stmt = null;
+		String username = "";
+		try
+        {
+			Class.forName("com.mysql.jdbc.Driver");
+            connection = DriverManager
+                .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
+			
+            stmt = connection.createStatement();
+	    	ResultSet rs = stmt.executeQuery(
+	    			"SELECT username " +
+                    "FROM users " +
+                    "WHERE confirmationString = \'" + confirmationString + "\'" + 
+                    "AND date_created > (NOW() - INTERVAL 30 MINUTE);"
+	    	);
+	    	while (rs.next()) {
+	    		username = rs.getString("username");
+	    	}
+	    	rs.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                stmt.close();
+                connection.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+		
+		if (username.isEmpty()) {
+            return Response.status(Response.Status.NOT_ACCEPTABLE)
+            		.entity("Invalid or Expired code given.").build();
+		}
+		
+		setUserRole(username, ROLE_AUTHORIZED);
+    	
+		connection = null;
+		stmt = null;
+		try
+        {
+			Class.forName("com.mysql.jdbc.Driver");
+            connection = DriverManager
+                .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
+             
+            stmt = connection.createStatement();
+            stmt.executeUpdate("UPDATE users " 
+            		         + "SET confirmationString='' " 
+            		         + "WHERE username='" + username + "';");
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                stmt.close();
+                connection.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+				
+        return Response.status(Response.Status.OK).entity("Account " + username + " activated.\n\n"
+        		+ " Click <a href=\"/beta/\">here</a> to return to the homepage").build();
+    }
+    
     @POST
     @Produces("application/json")
     public Response createNewUser(
@@ -341,10 +422,37 @@ public class UserResource {
 	    	rs.close();
 	    	stmt.close();
              
+			StringBuilder sb = new StringBuilder(30);
+			for( int i = 0; i < 30; i++ ) {
+		      sb.append(AB.charAt(rnd.nextInt(AB.length())));
+			}
+			String confirmationString = sb.toString();
+	    	
             stmt = connection.createStatement();
-            stmt.execute("INSERT INTO users (username,email,verified,password) "
-                                + "VALUES ('" + username + "','" + email + "','0','" + encodedPassword + "')");
-            setUserRole(username, ROLE_AUTHORIZED);
+            stmt.execute("INSERT INTO users (username,email,verified,password,confirmationString) "
+                                + "VALUES ('" + username + "','" + email + "','0','" 
+                                	+ encodedPassword + "','" + confirmationString + "')");
+            setUserRole(username, ROLE_DISABLED);
+                        
+    		try {
+	    		String host = "smtp.uq.edu.au";    
+	        	String to = username;
+	        	String from = "no-reply@qldarch.net";   
+	        	Properties properties = System.getProperties();  
+	        	properties.setProperty("mail.smtp.host", host);  
+	        
+	        	Session session = Session.getDefaultInstance(properties);  
+	        	MimeMessage message = new MimeMessage(session);  
+				message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
+	        	message.setFrom(new InternetAddress(from));
+	
+	        	message.setSubject("Qldarch Account Activation");  
+	        	message.setContent("Click <a href=\"http://qldarch-test.metadata.net/ws/rest/user/activation?code=" 
+	        			+ confirmationString + "\">here</a> to activate your account.", "text/html; charset=utf-8");
+	        	Transport.send(message);  
+	    	} catch (Exception e) {
+				e.printStackTrace();
+			}
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -356,27 +464,9 @@ public class UserResource {
             }
         }
 		
-        ObjectNode on = JsonNodeFactory.instance.objectNode();
 
-        try {
-            UsernamePasswordToken token =
-                new UsernamePasswordToken(username, password.toCharArray());
-            token.setRememberMe(false);
-            Subject currentUser = SecurityUtils.getSubject();
-            currentUser.login(token);
-            logger.trace("Successful authentication for {}", username);
-
-            on.put("user", username);
-            on.put("auth", true);
-            on.put("email", email);
-
-            return Response.ok()
-                .entity(on.toString())
-                .build();
-        } catch (AuthenticationException ea) {
-            logger.debug("Failed authentication for {}", username);
-        }
-        
-        return Response.status(Response.Status.NO_CONTENT).build();
+	    return Response.ok()
+	        .entity("Activation email sent to " + username)
+	        .build();
     }
 }
