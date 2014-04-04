@@ -6,7 +6,9 @@ import net.qldarch.web.service.KnownPrefixes;
 import net.qldarch.web.service.MetadataRepositoryException;
 import net.qldarch.web.service.RdfDataStoreDao;
 import net.qldarch.web.util.SparqlToJsonString;
+
 import org.codehaus.jackson.map.ObjectMapper;
+
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -15,7 +17,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.sun.jersey.core.header.FormDataContentDisposition;
 import com.sun.jersey.multipart.FormDataParam;
+
 import org.apache.commons.io.FilenameUtils;
+import org.apache.shiro.SecurityUtils;
 import org.apache.tika.Tika;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +33,7 @@ import java.nio.file.Files;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Set;
+
 import javax.servlet.ServletContext;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -40,6 +45,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response.Status;
 
 import static com.google.common.base.Functions.toStringFunction;
 import static com.google.common.base.Optional.fromNullable;
@@ -214,17 +220,13 @@ public class FileSummaryResource {
             @FormDataParam("file") InputStream file,
             @FormDataParam("file") FormDataContentDisposition fileDis)
                 throws IOException, MetadataRepositoryException {
-
-        /*
-        User user = User.currentUser();
-        if (user.isAnon()) {
-            return Response
-                .status(Status.FORBIDDEN)
-                .entity("{}")
-                .build();
+        if (!SecurityUtils.getSubject().isPermitted("file:create")) {
+        	return Response.status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
         }
-
-*/
+    	
         // Kludge so I can use curl to test.
         User user = new User("amuys");
 

@@ -161,6 +161,8 @@ public class ExpressionResource {
             "    } ." + 
             "  } UNION {" + 
             "    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) ." + 
+            "  } UNION {" + 
+            "    BIND ( <http://qldarch.net/ns/omeka-export/2013-02-06> AS ?g ) ." + 
             "  } ." + 
             "  graph ?g {" + 
             "    ?s ?p ?o ." + 
