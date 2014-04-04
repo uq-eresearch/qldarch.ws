@@ -59,7 +59,27 @@ public class EntitySummaryResource {
 
         return query;
     }
+    
+    public static String prepareSearchQuery(String searchString) {
+       String query = ENTITY_QUERIES.getInstanceOf("searchByLabelIds")
+               .add("searchString", searchString)
+               .render();
 
+       logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
+
+       return query;
+   }
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("search")
+    public String search(
+            @DefaultValue("") @QueryParam("searchString") String searchString) {
+        logger.debug("Querying search({})", searchString);
+        
+        return new SparqlToJsonString().performQuery(prepareSearchQuery(searchString));
+    }
+    
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("summary/{type : ([^/]+)?}")
@@ -72,7 +92,7 @@ public class EntitySummaryResource {
 
         return findByType(type, typelist, since, includeSubClass, includeSuperClass, true);
     }
-
+    
     /**
      * Get detailed records for entity.
      *

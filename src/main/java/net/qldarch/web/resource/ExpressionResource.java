@@ -6,7 +6,9 @@ import net.qldarch.web.model.User;
 import net.qldarch.web.service.*;
 import net.qldarch.web.util.Functions;
 import net.qldarch.web.util.SparqlToJsonString;
+
 import org.codehaus.jackson.map.ObjectMapper;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Multimap;
@@ -24,6 +26,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -42,7 +45,6 @@ import static com.google.common.base.Functions.toStringFunction;
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
 import static javax.ws.rs.core.Response.Status;
-
 import static net.qldarch.web.service.KnownURIs.*;
 import static net.qldarch.web.util.ResourceUtils.badRequest;
 import static net.qldarch.web.util.ResourceUtils.forbidden;
@@ -105,6 +107,26 @@ public class ExpressionResource {
         return query;
     }
 
+    public static String prepareSearchQuery(String searchString) {
+        String query = EXPRESSION_QUERIES.getInstanceOf("searchByLabelIds")
+                .add("searchString", searchString)
+                .render();
+
+        logger.debug("ExpressionSummaryResource performing SPARQL query: {}", query);
+
+        return query;
+    }
+
+     @GET
+     @Produces(MediaType.APPLICATION_JSON)
+     @Path("search")
+     public String search(
+             @DefaultValue("") @QueryParam("searchString") String searchString) {
+         logger.debug("Querying search({})", searchString);
+         
+         return new SparqlToJsonString().performQuery(prepareSearchQuery(searchString));
+     }
+    
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("summary/{type}")
