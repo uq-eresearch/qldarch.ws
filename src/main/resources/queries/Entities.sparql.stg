@@ -22,7 +22,7 @@ select distinct ?s ?p ?o where  {
         ?s a ?transType .
     } .
     graph ?g2 {
-            ?s ?p ?o .
+        ?s ?p ?o .
     } .
     $if(summary)$$restrictToSummary()$$endif$
 } BINDINGS ?type { $types:usingBinding(); separator=" "$ }
@@ -52,7 +52,7 @@ usingBinding(binding) ::= <<
 ( <$binding$> )
 >>
 
-searchByLabelIds(searchString) ::= <<
+searchByLabelIds(searchString, types, restrictType) ::= <<
 PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#>
 PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
 select distinct ?s ?p ?o where  {
@@ -66,6 +66,7 @@ select distinct ?s ?p ?o where  {
   graph ?g {
     ?s ?p ?o .
   } .
+  $if(restrictType)$$restrictToType()$$endif$
   {
     graph ?g {
       ?s <http://qldarch.net/ns/rdf/2012-06/terms#label> ?label .
@@ -76,7 +77,20 @@ select distinct ?s ?p ?o where  {
     } .
   }
   FILTER regex(?label, "$searchString$", "i").
-}
+} $if(restrictType)$$typeBindings(types)$$endif$
+>>
+
+typeBindings(types) ::= <<
+BINDINGS ?type { $types:usingBinding(); separator=" "$ }
+>>
+
+restrictToType() ::= <<
+graph ?g {
+   	?s a ?transType .
+} .
+{
+    BIND ( ?type AS ?transType ) .
+} . 
 >>
 
 byIds(ids, summary) ::= <<

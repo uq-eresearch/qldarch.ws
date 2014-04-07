@@ -60,9 +60,11 @@ public class EntitySummaryResource {
         return query;
     }
     
-    public static String prepareSearchQuery(String searchString) {
+    public static String prepareSearchQuery(String searchString, Collection<URI> types, boolean restrictType) {
        String query = ENTITY_QUERIES.getInstanceOf("searchByLabelIds")
                .add("searchString", searchString)
+               .add("types", types)
+               .add("restrictType", restrictType)
                .render();
 
        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
@@ -74,10 +76,17 @@ public class EntitySummaryResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Path("search")
     public String search(
-            @DefaultValue("") @QueryParam("searchString") String searchString) {
-        logger.debug("Querying search({})", searchString);
+            @DefaultValue("") @QueryParam("searchString") String searchString,
+            @DefaultValue("") @QueryParam("type") String type) {
+        Set<String> typeStrs = newHashSet(
+                Splitter.on(',').trimResults().omitEmptyStrings().split(type));
         
-        return new SparqlToJsonString().performQuery(prepareSearchQuery(searchString));
+        Collection<URI> typeURIs = transform(typeStrs, Functions.toResolvedURI());
+        
+        logger.debug("Querying search({},{},{})", searchString, typeURIs, !typeURIs.isEmpty());
+        
+        return new SparqlToJsonString().performQuery(
+        		prepareSearchQuery(searchString, typeURIs, !typeURIs.isEmpty()));
     }
     
     @GET
