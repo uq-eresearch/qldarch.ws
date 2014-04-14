@@ -142,3 +142,13 @@ select distinct ?r  where {
     }
 } BINDINGS ?e { $ids:usingBinding(); separator=" "$ }
 >>
+
+searchByUserId(id) ::= <<
+PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?s ?p ?o  where {
+    graph <$id$> {
+        ?s ?p ?o .
+    }
+}
+>>

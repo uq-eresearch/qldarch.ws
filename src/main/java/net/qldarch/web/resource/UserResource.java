@@ -51,7 +51,7 @@ public class UserResource {
     public static final String ROLE_EDITOR = "editor";
     public static final String ROLE_ROOT = "root";
 
-    private String AB = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private String AB = "123456789ABCDEFGHIJKLMNPQRSTWXYZ";
 	private Random rnd = new Random();
     
     @GET
@@ -325,6 +325,10 @@ public class UserResource {
                 .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
 			
             stmt = connection.createStatement();
+            logger.debug("Database query: SELECT username " +
+                    "FROM users " +
+                    "WHERE confirmationString = \'" + confirmationString + "\'" + 
+                    "AND date_created > (NOW() - INTERVAL 30 MINUTE);");
 	    	ResultSet rs = stmt.executeQuery(
 	    			"SELECT username " +
                     "FROM users " +
@@ -362,6 +366,9 @@ public class UserResource {
                 .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
              
             stmt = connection.createStatement();
+            logger.debug("Database query: UPDATE users " 
+   		         + "SET confirmationString='' " 
+   		         + "WHERE username='" + username + "';");
             stmt.executeUpdate("UPDATE users " 
             		         + "SET confirmationString='' " 
             		         + "WHERE username='" + username + "';");
@@ -378,6 +385,192 @@ public class UserResource {
 				
         return Response.status(Response.Status.OK).entity("Account " + username + " activated.\n\n"
         		+ " Click <a href=\"/beta/\">here</a> to return to the homepage").build();
+    }
+    
+    @GET
+    @Path("forgotPassword")
+    @Produces("application/json")
+    public Response confirmEmailAddress(
+    		@DefaultValue("") @QueryParam("username") String username) {
+    	
+    	Connection connection = null;
+		Statement stmt = null;
+		try
+        {
+			Class.forName("com.mysql.jdbc.Driver");
+            connection = DriverManager
+                .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
+			
+            stmt = connection.createStatement();
+            logger.debug("Database query: SELECT * FROM users WHERE username = '" + username + "'");
+	    	ResultSet rs = stmt.executeQuery("SELECT * FROM users WHERE username = '" + username + "'");
+	    	boolean accountFound = false;
+	    	while (rs.next()) {
+	    		accountFound = true;
+	    	}
+	    	rs.close();
+	    	stmt.close();
+	    	
+	    	if (!accountFound) {
+	            return Response.status(Response.Status.BAD_REQUEST)
+	                    .entity("No account with given address found.")
+	                    .build();
+	    	}
+             
+			StringBuilder sb = new StringBuilder(30);
+			for( int i = 0; i < 30; i++ ) {
+		      sb.append(AB.charAt(rnd.nextInt(AB.length())));
+			}
+			String confirmationString = sb.toString();
+	    	
+            stmt = connection.createStatement();
+            logger.debug("Database query: UPDATE users SET passwordConfirmationString = '" + confirmationString + "'"
+            		+ ",passwordRequested=current_timestamp"
+                    + " WHERE username='" + username + "'");
+            stmt.execute("UPDATE users SET passwordConfirmationString = '" + confirmationString + "'"
+            		+ ",passwordRequested=current_timestamp"
+                    + " WHERE username='" + username + "'");
+                        
+    		try {
+	    		String host = "smtp.uq.edu.au";    
+	        	String to = username;
+	        	String from = "no-reply@qldarch.net";   
+	        	Properties properties = System.getProperties();  
+	        	properties.setProperty("mail.smtp.host", host);  
+	        
+	        	Session session = Session.getDefaultInstance(properties);  
+	        	MimeMessage message = new MimeMessage(session);  
+				message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
+	        	message.setFrom(new InternetAddress(from));
+	
+	        	message.setSubject("Qldarch Password Reset");  
+	        	message.setContent("Click <a href=\"http://qldarch-test.metadata.net/ws/rest/user/resetPassword?code=" 
+	        			+ confirmationString + "\">here</a> to reset the password for account " + username + ".", "text/html; charset=utf-8");
+	        	Transport.send(message);  
+	    	} catch (Exception e) {
+				e.printStackTrace();
+			}
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                stmt.close();
+                connection.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+		
+	    return Response.ok()
+	        .entity("Confirmation email sent to " + username)
+	        .build();
+    }
+    		
+    @GET
+    @Path("resetPassword")
+    @Produces("text/html")
+    public Response resetPassword(
+    		@DefaultValue("") @QueryParam("code") String confirmationString) {
+    	if (confirmationString.isEmpty()) {
+            return Response.status(Response.Status.NOT_ACCEPTABLE)
+            		.entity("Invalid or Expired code given.").build();
+    	}
+    	Connection connection = null;
+		Statement stmt = null;
+		String username = "";
+		try
+        {
+			Class.forName("com.mysql.jdbc.Driver");
+            connection = DriverManager
+                .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
+			
+            stmt = connection.createStatement();
+            logger.debug("Database query: SELECT username " +
+                    "FROM users " +
+                    "WHERE passwordConfirmationString = \'" + confirmationString + "\'" + 
+                    "AND passwordRequested > (NOW() - INTERVAL 30 MINUTE);");
+	    	ResultSet rs = stmt.executeQuery(
+	    			"SELECT username " +
+                    "FROM users " +
+                    "WHERE passwordConfirmationString = \'" + confirmationString + "\'" + 
+                    "AND passwordRequested > (NOW() - INTERVAL 30 MINUTE);"
+	    	);
+	    	while (rs.next()) {
+	    		username = rs.getString("username");
+	    	}
+	    	rs.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                stmt.close();
+                connection.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+		
+		if (username.isEmpty()) {
+            return Response.status(Response.Status.NOT_ACCEPTABLE)
+            		.entity("Invalid or Expired code given.").build();
+		}
+		
+		StringBuilder sb = new StringBuilder(30);
+		for( int i = 0; i < 8; i++ ) {
+	      sb.append(AB.charAt(rnd.nextInt(AB.length())));
+		}
+		String password = sb.toString();
+				
+		DefaultPasswordService ps = new DefaultPasswordService();
+		String encodedPassword = ps.encryptPassword(password);
+		    	
+		connection = null;
+		stmt = null;
+		try
+        {
+			Class.forName("com.mysql.jdbc.Driver");
+            connection = DriverManager
+                .getConnection("jdbc:mysql://localhost:3306/UserDB?autoReconnect=true", "auth", "tmppassword");
+             
+            stmt = connection.createStatement();
+            logger.debug("Database query: UPDATE users " 
+   		         + "SET password='" + encodedPassword + "' " 
+   		         + "WHERE username='" + username + "';");
+            stmt.executeUpdate("UPDATE users " 
+            		         + "SET password='" + encodedPassword + "' " 
+            		         + "WHERE username='" + username + "';");
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                stmt.close();
+                connection.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+			
+  
+		try {
+    		String host = "smtp.uq.edu.au";    
+        	String to = username;
+        	String from = "no-reply@qldarch.net";   
+        	Properties properties = System.getProperties();  
+        	properties.setProperty("mail.smtp.host", host);  
+        
+        	Session session = Session.getDefaultInstance(properties);  
+        	MimeMessage message = new MimeMessage(session);  
+			message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
+        	message.setFrom(new InternetAddress(from));
+
+        	message.setSubject("Qldarch Password Reset");  
+        	message.setContent("New password for account " + username + " is " + password + ".", "text/html; charset=utf-8");
+        	Transport.send(message);  
+    	} catch (Exception e) {
+			e.printStackTrace();
+		}
+	
+        return Response.status(Response.Status.OK).entity("New password emailed.").build();
     }
     
     @POST

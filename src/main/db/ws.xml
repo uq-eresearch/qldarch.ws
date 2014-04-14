@@ -8,12 +8,12 @@
         username="auth" password="tmppassword" driverClassName="com.mysql.jdbc.Driver"
         url="jdbc:mysql://localhost:3306/userdb?autoReconnect=true"/>
 
-    <Parameter name="net.qldarch.context.archivedir" value="/var/lib/qldarch/archive" override="false"/>
+    <Parameter name="net.qldarch.context.archivedir" value="/var/www/html/files" override="false"/>
     <!--
     <env-entry>
         <env-entry-name>archive-dir</env-entry-name>
         <env-entry-type>java.lang.String</env-entry-type>
-        <env-entry-value>/var/lib/qldarch/archive</env-entry-value>
+        <env-entry-value>/var/www/html/files</env-entry-value>
     </env-entry>
     -->
 </Context>

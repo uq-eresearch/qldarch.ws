@@ -1,5 +1,7 @@
 package net.qldarch.web.resource;
 
+import net.coobird.thumbnailator.Thumbnails;
+import net.qldarch.av.parser.TranscriptParser;
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
 import net.qldarch.web.service.KnownPrefixes;
@@ -18,6 +20,7 @@ import com.google.common.collect.Iterators;
 import com.sun.jersey.core.header.FormDataContentDisposition;
 import com.sun.jersey.multipart.FormDataParam;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.shiro.SecurityUtils;
 import org.apache.tika.Tika;
@@ -25,8 +28,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -226,7 +232,7 @@ public class FileSummaryResource {
                     .entity("Permission Denied.")
                     .build();
         }
-    	
+        
         // Kludge so I can use curl to test.
         User user = new User("amuys");
 
@@ -252,9 +258,57 @@ public class FileSummaryResource {
 
         // Yes, this should be a URL, but Java doesn't permit conversion from relative URI to URL!
         String locationURI = destFile.toString().substring(this.archiveDir.toString().length() + 1);
-
+        
         Files.copy(file, tmpFile.toPath());
 
+        boolean isTranscript = (stripExt.toLowerCase().equals("doc") || stripExt.toLowerCase().equals("txt"));
+        String transcriptLocationURI = "";
+        if (isTranscript) {
+        	InputStream is = new FileInputStream(tmpFile);
+        	TranscriptParser parser = new TranscriptParser(is);
+        	PrintStream ps = null;
+        	try {
+                parser.parse();
+            	File transcriptFile = new File(userFileDir, String.format("%s-%d-%s.%s.transcript.json",
+                        user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+            	ps = new PrintStream(new FileOutputStream(transcriptFile, false));
+                parser.printJson(ps);
+                
+                transcriptLocationURI = transcriptFile.toString().substring(this.archiveDir.toString().length() + 1);
+            } catch (IllegalStateException ei) {
+            	ei.printStackTrace();
+            	isTranscript = false;
+            } finally {
+                is.close();
+                try {
+                	if (ps != null) {
+                		ps.flush();
+                		ps.close();
+                	}
+                } catch (Exception e) {
+                	e.printStackTrace();
+                }
+            }
+        }
+        
+        boolean canMakeThumbnail = (stripExt.toLowerCase().equals("jpg") || 
+        		stripExt.toLowerCase().equals("jpeg") || stripExt.toLowerCase().equals("png") || 
+        		stripExt.toLowerCase().equals("gif") || stripExt.toLowerCase().equals("bmp"));
+        String thumbmnailLocationURI = "";
+        if (canMakeThumbnail) {
+            try {
+            	File thumbnailFile = new File(userFileDir, String.format("%s-%d-%s.thumbnail.%s",
+                        user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+            	
+    			Thumbnails.of(tmpFile).size(200, 200).toFile(thumbnailFile);
+                
+    			thumbmnailLocationURI = thumbnailFile.toString().substring(this.archiveDir.toString().length() + 1);
+    		} catch (IOException e) {
+    			canMakeThumbnail = false;
+    			e.printStackTrace();
+    		}
+        }
+        
         logger.info("File creation date: {}", fileDis.getCreationDate());
         logger.info("File filename: {}", fileDis.getFileName());
         logger.info("File modification date: {}", fileDis.getModificationDate());
@@ -266,6 +320,12 @@ public class FileSummaryResource {
         logger.info("destFile: {}", destFile);
         logger.info("metaFile: {}", metaFile);
         logger.info("locationURI: {}", locationURI);
+        if (isTranscript) {
+            logger.info("transcriptLocation: {}", transcriptLocationURI);
+        }
+        if (canMakeThumbnail) {
+        	logger.info("thumbnailLocation: {}", thumbmnailLocationURI);
+        }
 
         String mimetype = new Tika().detect(tmpFile);
 
@@ -282,7 +342,13 @@ public class FileSummaryResource {
         fileDesc.addProperty(QA_BASIC_MIME_TYPE, mimetype);
         fileDesc.addProperty(QA_MANAGED_FILE, true);
         fileDesc.addProperty(QA_SYSTEM_LOCATION, locationURI.toString());
-
+        if (isTranscript) {
+        	fileDesc.addProperty(QA_TRANSCRIPT_FILE, transcriptLocationURI.toString());
+        }
+        if (canMakeThumbnail) {
+        	fileDesc.addProperty(QA_THUMBNAIL_FILE, thumbmnailLocationURI.toString());
+        }
+        	
         String entity = null;
         try {
             URI id = user.newId(userFileGraph, QA_DIGITAL_FILE);

@@ -70,8 +70,18 @@ public class EntitySummaryResource {
        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
 
        return query;
-   }
+    }
+    
+    public static String prepareSearchByUserQuery(URI userExpressionID) {
+        String query = ENTITY_QUERIES.getInstanceOf("searchByUserId")
+                .add("id", userExpressionID)
+                .render();
 
+        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
+
+        return query;
+    }
+    
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("search")
@@ -100,6 +110,19 @@ public class EntitySummaryResource {
             @DefaultValue("") @QueryParam("TYPELIST") String typelist) {
 
         return findByType(type, typelist, since, includeSubClass, includeSuperClass, true);
+    }
+    
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("user")
+    public String search(
+            @DefaultValue("") @QueryParam("ID") String id) {
+    	User user = new User(id);
+    	
+    	URI userFileGraph = user.getEntityGraph();
+        
+        return new SparqlToJsonString().performQuery(
+        		prepareSearchByUserQuery(userFileGraph));
     }
     
     /**
@@ -145,6 +168,8 @@ public class EntitySummaryResource {
             throw new IllegalArgumentException("Empty id collection passed to findEvidenceByIds()");
         }
 
+        logger.debug("EntityResource performing SPARQL query: {}, {}", summary, ids);
+        
         String query = ENTITY_QUERIES.getInstanceOf("byIds")
                 .add("ids", ids)
                 .add("summary", summary)

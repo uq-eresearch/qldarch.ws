@@ -119,6 +119,16 @@ public class ExpressionResource {
         return query;
     }
 
+    public static String prepareSearchByUserQuery(URI userExpressionID) {
+        String query = EXPRESSION_QUERIES.getInstanceOf("searchByUserId")
+                .add("id", userExpressionID)
+                .render();
+
+        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
+
+        return query;
+    }
+    
      @GET
      @Produces(MediaType.APPLICATION_JSON)
      @Path("search")
@@ -146,6 +156,19 @@ public class ExpressionResource {
         return findByType(type, typelist, true);
     }
 
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("user")
+    public String search(
+            @DefaultValue("") @QueryParam("ID") String id) {
+    	User user = new User(id);
+    	
+    	URI userFileGraph = user.getExpressionGraph();
+        
+        return new SparqlToJsonString().performQuery(
+        		prepareSearchByUserQuery(userFileGraph));
+    }
+    
     /**
      * Get detailed records for entity.
      *

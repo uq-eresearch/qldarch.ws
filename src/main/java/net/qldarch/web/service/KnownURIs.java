@@ -45,6 +45,10 @@ public interface KnownURIs {
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#hasFileSize");
     public static final URI QA_SOURCE_FILENAME = 
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#sourceFilename");
+    public static final URI QA_TRANSCRIPT_FILE = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#transcriptFile");
+    public static final URI QA_THUMBNAIL_FILE = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#thumbnailFile");
     public static final URI QA_SYSTEM_LOCATION = 
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#systemLocation");
     public static final URI QA_DIGITAL_FILE = 
