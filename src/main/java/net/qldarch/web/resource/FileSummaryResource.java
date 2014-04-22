@@ -1,6 +1,7 @@
 package net.qldarch.web.resource;
 
 import net.coobird.thumbnailator.Thumbnails;
+import net.coobird.thumbnailator.geometry.Positions;
 import net.qldarch.av.parser.TranscriptParser;
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
@@ -291,20 +292,28 @@ public class FileSummaryResource {
             }
         }
         
-        boolean canMakeThumbnail = (stripExt.toLowerCase().equals("jpg") || 
+        boolean isImage = (stripExt.toLowerCase().equals("jpg") || 
         		stripExt.toLowerCase().equals("jpeg") || stripExt.toLowerCase().equals("png") || 
         		stripExt.toLowerCase().equals("gif") || stripExt.toLowerCase().equals("bmp"));
+        String webFileLocationURI = "";
         String thumbmnailLocationURI = "";
-        if (canMakeThumbnail) {
+        if (isImage) {
             try {
+            	File webFile = new File(userFileDir, String.format("%s-%d-%s.thumbnail.%s",
+                        user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+            	
+    			Thumbnails.of(tmpFile).crop(Positions.CENTER).size(800, 800).toFile(webFile);
+                
+    			webFileLocationURI = webFile.toString().substring(this.archiveDir.toString().length() + 1);
+
             	File thumbnailFile = new File(userFileDir, String.format("%s-%d-%s.thumbnail.%s",
                         user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
             	
-    			Thumbnails.of(tmpFile).size(200, 200).toFile(thumbnailFile);
+    			Thumbnails.of(tmpFile).crop(Positions.CENTER).size(200, 200).toFile(thumbnailFile);
                 
     			thumbmnailLocationURI = thumbnailFile.toString().substring(this.archiveDir.toString().length() + 1);
     		} catch (IOException e) {
-    			canMakeThumbnail = false;
+    			isImage = false;
     			e.printStackTrace();
     		}
         }
@@ -323,7 +332,8 @@ public class FileSummaryResource {
         if (isTranscript) {
             logger.info("transcriptLocation: {}", transcriptLocationURI);
         }
-        if (canMakeThumbnail) {
+        if (isImage) {
+        	logger.info("webFileLocation: {}", webFileLocationURI);
         	logger.info("thumbnailLocation: {}", thumbmnailLocationURI);
         }
 
@@ -345,7 +355,8 @@ public class FileSummaryResource {
         if (isTranscript) {
         	fileDesc.addProperty(QA_TRANSCRIPT_FILE, transcriptLocationURI.toString());
         }
-        if (canMakeThumbnail) {
+        if (isImage) {
+        	fileDesc.addProperty(QA_WEB_FILE, webFileLocationURI.toString());
         	fileDesc.addProperty(QA_THUMBNAIL_FILE, thumbmnailLocationURI.toString());
         }
         	

@@ -46,6 +46,17 @@ select distinct ?s ?p ?o where  {
 } $if(restrictType)$$typeBindings(types)$$endif$
 >>
 
+extractGraphContext(ids) ::= <<
+PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+select distinct ?r  where {
+    graph ?g1 {
+        ?e a ?t .
+        BIND (?g1 AS ?r) .
+    }
+} BINDINGS ?e { $ids:usingBinding(); separator=" "$ }
+>>
+
 restrictToType() ::= <<
 graph ?g {
    	?s a ?transType .

@@ -55,7 +55,53 @@ public class EntitySummaryResource {
                 .add("summary", summary)
                 .render();
 
-        logger.debug("AnnotationResource performing SPARQL query: {}", query);
+        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
+
+        return query;
+    }
+   
+    public static String prepareMergeUpdate(String intoResource, String fromResource) {
+        String query = ENTITY_QUERIES.getInstanceOf("merge")
+                .add("intoResource", intoResource)
+                .add("fromResource", fromResource)
+                .render();
+
+        logger.debug("EntitySummaryResource performing SPARQL update: {}", query);
+
+        return query;
+    }
+    
+    @PUT
+    @Path("merge")
+    public Response merge (
+            @DefaultValue("") @QueryParam("intoResource") String intoResource,
+            @DefaultValue("") @QueryParam("fromResource") String fromResource) {
+        if (!SecurityUtils.getSubject().isPermitted("entity:delete")) {
+        	return Response
+                    .status(Status.FORBIDDEN)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Permission Denied.")
+                    .build();
+        }
+        
+        try {
+        	this.getRdfDao().updateForRdfResources(prepareMergeUpdate(intoResource, fromResource));
+        } catch (MetadataRepositoryException e) {
+        	e.printStackTrace();
+        	return Response
+                    .status(Status.INTERNAL_SERVER_ERROR)
+                    .entity(e)
+                    .build();
+        }
+    	return Response.status(Status.OK).build();
+    }
+    
+    public static String prepareSearchByUserQuery(URI userExpressionID) {
+        String query = ENTITY_QUERIES.getInstanceOf("searchByUserId")
+                .add("id", userExpressionID)
+                .render();
+
+        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
 
         return query;
     }
@@ -70,16 +116,6 @@ public class EntitySummaryResource {
        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
 
        return query;
-    }
-    
-    public static String prepareSearchByUserQuery(URI userExpressionID) {
-        String query = ENTITY_QUERIES.getInstanceOf("searchByUserId")
-                .add("id", userExpressionID)
-                .render();
-
-        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
-
-        return query;
     }
     
     @GET

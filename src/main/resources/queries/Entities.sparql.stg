@@ -152,3 +152,38 @@ select distinct ?s ?p ?o  where {
     }
 }
 >>
+
+merge(intoResource, fromResource) ::= <<
+PREFIX : <http://qldarch.net/ns/rdf/2012-06/terms#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+PREFIX qldarch:<http://qldarch.net/ns/rdf/2012-06/terms#>
+
+INSERT { GRAPH ?g1 {
+  ?s ?p <$intoResource$>.
+}}
+WHERE { GRAPH  ?g1 { 
+  ?s ?p <$fromResource$>.
+}};
+
+INSERT { GRAPH ?g1 {
+  <$intoResource$> qldarch:relatedTo ?o.
+}}
+WHERE { GRAPH  ?g1 { 
+  <$fromResource$> qldarch:relatedTo ?o.
+}};
+
+DELETE { 
+  ?s ?p2 <$fromResource$> .
+}
+WHERE { 
+  ?s ?p2 <$fromResource$> .
+};
+
+DELETE { 
+  <$fromResource$> qldarch:relatedTo ?o .
+}
+WHERE { 
+  <$fromResource$> qldarch:relatedTo ?o .
+};
+>>
+

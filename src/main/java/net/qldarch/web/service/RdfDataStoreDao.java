@@ -3,6 +3,7 @@ package net.qldarch.web.service;
 import net.qldarch.web.model.QldarchOntology;
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
+
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
@@ -128,6 +129,19 @@ public class RdfDataStoreDao {
         });
     }
 
+    public void updateForRdfResources(final String query) throws MetadataRepositoryException {
+        this.getConnectionPool().performOperation(new RepositoryOperation() {
+            public void perform(RepositoryConnection conn)
+                    throws RepositoryException, MetadataRepositoryException {
+            	try {
+					conn.prepareUpdate(QueryLanguage.SPARQL, query).execute();
+				} catch (UpdateExecutionException | MalformedQueryException e) {
+					e.printStackTrace();
+				}
+            }
+        });
+    }
+    
     public List<URI> queryForRdfResources(final String query) throws MetadataRepositoryException {
         return this.getConnectionPool().performQuery(new RepositorySingletonQuery() {
             @Override

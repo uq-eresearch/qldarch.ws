@@ -448,9 +448,26 @@ public class ExpressionResource {
             return badRequest("QueryParam ID missing or invalid");
         }
         
-        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
+        List<URI> graphURIs = null;
+        try {
+            String query = EXPRESSION_QUERIES.getInstanceOf("extractGraphContext")
+                    .add("ids", idURIs)
+                    .render();
 
-        URI userEntityGraph = user.getEntityGraph();
+            logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
+
+            graphURIs = this.getRdfDao().queryForRdfResources(query);
+        } catch (MetadataRepositoryException e) {
+            logger.warn("Error extracting graph from entity id: {})", id);
+            return internalError("Error extracting graph from entity id");
+        }
+
+        if (graphURIs.isEmpty()) {
+            logger.info("Bad request received. No graph identified from expression id provided.");
+            return badRequest("No graph identified from entity id provided");
+        }
+        
+        RdfDescription rdf = new ObjectMapper().readValue(json, RdfDescription.class);
 
         // Check Entity type
         List<URI> types = rdf.getType();
@@ -474,9 +491,9 @@ public class ExpressionResource {
 	
 	            rdf.setURI(entity);
 	            
-	            this.getRdfDao().updateRdfDescription(rdf, userEntityGraph);
+	            this.getRdfDao().updateRdfDescription(rdf, graphURIs.get(0));
 	        } catch (MetadataRepositoryException em) {
-	            logger.warn("Error performing updating graph:{}, rdf:{})", userEntityGraph, rdf, em);
+	            logger.warn("Error performing updating graph:{}, rdf:{})", graphURIs.get(0), rdf, em);
 	            return internalError("Error performing insertRdfDescription");
 	        }
 	    }
