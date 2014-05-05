@@ -254,6 +254,8 @@ public class FileSummaryResource {
                     user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
         File destFile = new File(userFileDir, String.format("%s-%d-%s.%s",
                     user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+        File fullFile = new File(userFileDir, String.format("full/%s-%d-%s.%s",
+                user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
         File metaFile = new File(userFileDir, String.format("%s-%d-%s.%s.json",
                     user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
 
@@ -270,7 +272,7 @@ public class FileSummaryResource {
         	PrintStream ps = null;
         	try {
                 parser.parse();
-            	File transcriptFile = new File(userFileDir, String.format("%s-%d-%s.%s.transcript.json",
+            	File transcriptFile = new File(userFileDir, String.format("transcript/%s-%d-%s.%s.json",
                         user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
             	ps = new PrintStream(new FileOutputStream(transcriptFile, false));
                 parser.printJson(ps);
@@ -299,14 +301,16 @@ public class FileSummaryResource {
         String thumbmnailLocationURI = "";
         if (isImage) {
             try {
-            	File webFile = new File(userFileDir, String.format("%s-%d-%s.thumbnail.%s",
+                Files.copy(destFile.toPath(), fullFile.toPath());
+                
+            	File webFile = new File(userFileDir, String.format("web/%s-%d-%s.thumbnail.%s",
                         user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
             	
     			Thumbnails.of(tmpFile).crop(Positions.CENTER).size(800, 800).toFile(webFile);
                 
     			webFileLocationURI = webFile.toString().substring(this.archiveDir.toString().length() + 1);
 
-            	File thumbnailFile = new File(userFileDir, String.format("%s-%d-%s.thumbnail.%s",
+            	File thumbnailFile = new File(userFileDir, String.format("thumbs/%s-%d-%s.thumbnail.%s",
                         user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
             	
     			Thumbnails.of(tmpFile).crop(Positions.CENTER).size(200, 200).toFile(thumbnailFile);

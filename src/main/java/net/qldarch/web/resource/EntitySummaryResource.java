@@ -205,7 +205,7 @@ public class EntitySummaryResource {
         }
 
         logger.debug("EntityResource performing SPARQL query: {}, {}", summary, ids);
-        
+        logger.debug("{}", (ids == null));
         String query = ENTITY_QUERIES.getInstanceOf("byIds")
                 .add("ids", ids)
                 .add("summary", summary)
