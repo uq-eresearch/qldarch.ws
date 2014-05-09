@@ -96,17 +96,24 @@ graph ?g {
 byIds(ids, summary) ::= <<
 PREFIX :<http://qldarch.net/ns/rdf/2012-06/terms#>
 PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
-select distinct ?s ?p ?o where  {
+select distinct ?s ?p ?o 
+where  {
   {
-    graph <http://qldarch.net/rdf/2013-09/catalog> {
-      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g.
-    } .
+	  {
+	    graph <http://qldarch.net/rdf/2013-09/catalog> {
+	      ?u <http://qldarch.net/ns/rdf/2013-09/catalog#hasEntityGraph> ?g.
+	    } .
+	  } UNION {
+	    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) .
+	  } .
+	  graph ?g {
+	    ?s ?p ?o .
+	  } .
   } UNION {
-    BIND ( <http://qldarch.net/rdf/2012/12/resources#> AS ?g ) .
-  } .
-  graph ?g {
-    ?s ?p ?o .
-  } .
+	    ?o <http://qldarch.net/ns/rdf/2012-06/terms#depictsArchitect> ?s .
+		FILTER NOT EXISTS {?s <http://qldarch.net/ns/rdf/2012-06/terms#preferredImage> ?preferredImage }
+		BIND (<http://qldarch.net/ns/rdf/2012-06/terms#preferredImage> AS ?p).
+  }
   $if(summary)$$restrictToSummary()$$endif$
 } BINDINGS ?s { $ids:usingBinding(); separator=" "$ }
 >>
