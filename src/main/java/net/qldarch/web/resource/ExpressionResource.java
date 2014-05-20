@@ -1,13 +1,18 @@
 package net.qldarch.web.resource;
 
+import net.qldarch.av.parser.TranscriptParser;
 import net.qldarch.web.model.QldarchOntology;
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
 import net.qldarch.web.service.*;
 import net.qldarch.web.util.Functions;
+import net.qldarch.web.util.SolrIngest;
 import net.qldarch.web.util.SparqlToJsonString;
 
 import org.codehaus.jackson.map.ObjectMapper;
+import org.dom4j.Document;
+import org.dom4j.DocumentHelper;
+import org.dom4j.Element;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -19,12 +24,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.stringtemplate.v4.STGroupFile;
 
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.ws.rs.Consumes;
@@ -331,6 +339,13 @@ public class ExpressionResource {
             // Generate and Perform insertRdfDescription query
             this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_EXPRESSION_GRAPH,
                     userExpressionGraph);
+
+            if (type.toString().equalsIgnoreCase("http://qldarch.net/ns/rdf/2012-06/terms#Article")) {
+            	SolrIngest.ingestArticle(rdf.getURI());
+            }
+            if (type.toString().equalsIgnoreCase("http://qldarch.net/ns/rdf/2012-06/terms#Interview")) {
+            	SolrIngest.ingestTranscript(rdf.getURI());
+            }
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insertRdfDescription graph:{}, rdf:{})", userExpressionGraph, rdf, em);
             return Response
@@ -391,6 +406,7 @@ public class ExpressionResource {
 
         for (URI entity : entityURIs) {
             try {
+                SolrIngest.delete(entity);
                 this.getRdfDao().deleteRdfResource(entity);
             } catch (MetadataRepositoryException e) {
                 logger.warn("Error performing delete entity:{})", entity);

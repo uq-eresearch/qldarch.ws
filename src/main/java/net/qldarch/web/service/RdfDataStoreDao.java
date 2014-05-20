@@ -18,7 +18,9 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static net.qldarch.web.service.KnownURIs.*;
@@ -50,6 +52,7 @@ public class RdfDataStoreDao {
                     throws RepositoryException, MetadataRepositoryException {
                 URIImpl contextURI = new URIImpl(graph.toString());
 
+                conn.remove(new URIImpl(rdf.getURI().toString()), null, null, contextURI);
                 for (Statement s : rdf.asStatements()) {
                     conn.remove(s.getSubject(), s.getPredicate(), null, contextURI);
                 }
@@ -163,6 +166,37 @@ public class RdfDataStoreDao {
 
                     return resources;
 
+                } catch (QueryEvaluationException e) {
+                    logger.warn("Query failed: {}", query, e);
+                    throw new MetadataRepositoryException("Query failed", e);
+                } catch (MalformedQueryException e) {
+                    logger.warn("Query malformed: {}", query, e);
+                    throw new MetadataRepositoryException("Query malformed", e);
+                }
+            }
+        });
+    }
+    
+    public Map<String, String> queryForRdfResource(final String query, final List<String> values) throws MetadataRepositoryException {
+        return this.getConnectionPool().performQuery(new RepositoryResourceQuery() {
+            @Override
+            public Map<String, String> query(RepositoryConnection conn) throws RepositoryException, MetadataRepositoryException {
+                try {
+                    TupleQueryResult result = conn.prepareTupleQuery(QueryLanguage.SPARQL, query).evaluate();
+                    Map<String, String> resources = new HashMap<String, String>();
+
+                    if (result.hasNext()) {
+	                    BindingSet bs = result.next();
+	                    for (String value: values) {
+	                    	if (bs.getValue(value) != null) {
+	                    		Value r = bs.getValue(value);
+	
+	                        	resources.put(value, r.toString());
+	                    	}
+	                    }
+                    }
+
+                    return resources;
                 } catch (QueryEvaluationException e) {
                     logger.warn("Query failed: {}", query, e);
                     throw new MetadataRepositoryException("Query failed", e);

@@ -444,7 +444,7 @@ public class UserResource {
 	        	message.setFrom(new InternetAddress(from));
 	
 	        	message.setSubject("Qldarch Password Reset");  
-	        	message.setContent("Click <a href=\"http://qldarch-test.metadata.net/ws/rest/user/resetPassword?code=" 
+	        	message.setContent("Click <a href=\"http://qldarch.net/ws/rest/user/resetPassword?code=" 
 	        			+ confirmationString + "\">here</a> to reset the password for account " + username + ".", "text/html; charset=utf-8");
 	        	Transport.send(message);  
 	    	} catch (Exception e) {
@@ -640,7 +640,7 @@ public class UserResource {
 	        	message.setFrom(new InternetAddress(from));
 	
 	        	message.setSubject("Qldarch Account Activation");  
-	        	message.setContent("Click <a href=\"http://qldarch-test.metadata.net/ws/rest/user/activation?code=" 
+	        	message.setContent("Click <a href=\"http://qldarch.net/ws/rest/user/activation?code=" 
 	        			+ confirmationString + "\">here</a> to activate your account.", "text/html; charset=utf-8");
 	        	Transport.send(message);  
 	    	} catch (Exception e) {
