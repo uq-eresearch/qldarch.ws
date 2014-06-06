@@ -86,31 +86,31 @@ public class RdfDescription {
 
     @JsonAnySetter
     public void addProperty(String name, Object value) throws MetadataRepositoryException {
-        logger.info("Received {} => {}::{}", name, value, value.getClass());
+        logger.info("Received " + name + " => " + value + "::" + value.getClass());
         URI nameURI = KnownPrefixes.resolve(name);
         if (value instanceof Map) {
             @SuppressWarnings("unchecked")
             RdfDescription rdfDesc = new RdfDescription((Map)value);
             properties.put(nameURI, rdfDesc);
-            logger.info("Materializing as {} => {}::{}", nameURI, rdfDesc, rdfDesc.getClass());
+            logger.info("Materializing as " + nameURI + " => " + rdfDesc + "::" + rdfDesc.getClass());
         } else if (value instanceof List) {
             for (Object prop : (List<?>)value) {
                 this.addProperty(name, prop);
-                logger.info("Materializing as {} => {}::{}", nameURI, prop, prop.getClass());
+                logger.info("Materializing as " + nameURI + " => " + prop + "::" + prop.getClass());
             }
         } else {
             this.properties.put(nameURI, value);
-            logger.info("Materializing as {} => {}::{}", nameURI, value, value.getClass());
+            logger.info("Materializing as " + nameURI + " => " + value + "::" + value.getClass());
         }
     }
 
     @JsonIgnore
     public void addProperty(URI predicate, Object value) throws MetadataRepositoryException {
-        logger.info("Adding explicitly {} => {}::{}", predicate, value, value.getClass());
+        logger.info("Adding explicitly " + predicate + " => " + value + "::" + value.getClass());
         if (value instanceof List) {
             for (Object prop : (List<?>)value) {
                 this.addProperty(predicate, prop);
-                logger.info("Expanding to {} => {}::{}", predicate, prop, prop.getClass());
+                logger.info("Expanding to " + predicate + " => " + prop + "::" + prop.getClass());
             }
         } else {
             this.properties.put(predicate, value);
@@ -199,12 +199,10 @@ public class RdfDescription {
                     URIImpl predicateURI = new URIImpl(entry.getKey().toString());
                     Object object = entry.getValue();
                     String objectString = object.toString();
-                    logger.trace("Generating statement: {}, {}, str({})",
-                            subjectURI, predicateURI, objectString);
+                    logger.trace("Generating statement: " + subjectURI + ", " + predicateURI + ", str(" + objectString + ")");
                     Value objectValue = getOntology().convertObject(entry.getKey(), entry.getValue());
 
-                    logger.trace("Generated statement: {}, {}, {}",
-                            subjectURI, predicateURI, objectValue);
+                    logger.trace("Generated statement: " + subjectURI + ", " + predicateURI + ", " + objectValue);
                     return new StatementImpl(subjectURI, predicateURI, objectValue);
                 } catch (MetadataRepositoryException em) {
                     return null;

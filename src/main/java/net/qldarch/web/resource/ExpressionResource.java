@@ -52,7 +52,6 @@ import javax.ws.rs.core.Response.Status;
 import static com.google.common.base.Functions.toStringFunction;
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
-import static javax.ws.rs.core.Response.Status;
 import static net.qldarch.web.service.KnownURIs.*;
 import static net.qldarch.web.util.ResourceUtils.badRequest;
 import static net.qldarch.web.util.ResourceUtils.forbidden;
@@ -148,7 +147,7 @@ public class ExpressionResource {
          
          Collection<URI> typeURIs = transform(typeStrs, Functions.toResolvedURI());
          
-         logger.debug("Querying search({},{},{})", searchString, typeURIs, !typeURIs.isEmpty());
+         logger.debug("Querying search(" + searchString + "," + typeURIs + "," + !typeURIs.isEmpty() + ")");
          
          return new SparqlToJsonString().performQuery(
         		 prepareSearchQuery(searchString, typeURIs, !typeURIs.isEmpty()));
@@ -195,7 +194,7 @@ public class ExpressionResource {
     }
 
     public String findByType(String type, String typelist, boolean summary) {
-        logger.debug("Querying summary({}) by type: {}, typelist: {}", summary, type, typelist);
+        logger.debug("Querying summary(" + summary + ") by type: " + type + ", typelist: " + typelist);
 
         Set<String> typeStrs = newHashSet(
                 Splitter.on(',').trimResults().omitEmptyStrings().split(typelist));
@@ -256,7 +255,7 @@ public class ExpressionResource {
             @DefaultValue("") @QueryParam("ID") String id,
             @DefaultValue("") @QueryParam("IDLIST") String idlist,
             @DefaultValue("false") @QueryParam("SUMMARY") boolean summary) {
-        logger.debug("Querying summary({}) by id: {}, idlist: {}", summary, id, idlist);
+        logger.debug("Querying summary(" + summary + ") by id: " + id + ", idlist: " + idlist);
 
         Set<String> idStrs = newHashSet(
                 Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
@@ -347,7 +346,7 @@ public class ExpressionResource {
             	SolrIngest.ingestTranscript(rdf.getURI());
             }
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insertRdfDescription graph:{}, rdf:{})", userExpressionGraph, rdf, em);
+            logger.warn("Error performing insertRdfDescription graph:" + userExpressionGraph + ", rdf:" + rdf +")");
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
@@ -509,7 +508,7 @@ public class ExpressionResource {
 	            
 	            this.getRdfDao().updateRdfDescription(rdf, graphURIs.get(0));
 	        } catch (MetadataRepositoryException em) {
-	            logger.warn("Error performing updating graph:{}, rdf:{})", graphURIs.get(0), rdf, em);
+	            logger.warn("Error performing updating graph:" + graphURIs.get(0) + ", rdf:" + rdf + ")", em);
 	            return internalError("Error performing insertRdfDescription");
 	        }
 	    }

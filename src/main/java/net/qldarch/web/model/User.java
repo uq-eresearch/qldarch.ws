@@ -116,24 +116,21 @@ public class User {
                 if (typeFrag.getScheme() != null ||
                         typeFrag.getAuthority() != null ||
                         typeFrag.getQuery() != null) {
-                    logger.warn("Unexpected resolved shorttype. type:{} ns:{} short:{}",
-                            type, ns, typeFrag);
+                    logger.warn("Unexpected resolved shorttype. type:" + type + " ns:" + ns + " short:"+ typeFrag);
                     continue;
                 }
                 String fragment = typeFrag.getFragment();
                 String path = typeFrag.getPath();
                 if ((fragment == null || fragment.isEmpty()) && (path == null || path.isEmpty())) {
-                    logger.info("No fragment or path found in shorttype. type:{} ns:{} short:{}",
-                            type, ns, typeFrag);
+                    logger.info("No fragment or path found in shorttype. type:" + type + " ns:" + ns + " short:" + typeFrag);
                     continue;
                 } else if (fragment == null || fragment.isEmpty()) {
                     shorttype = path;
                 } else if (path == null || path.isEmpty()) {
                     shorttype = fragment;
                 } else {
-                    logger.info("Both fragment or path found in shorttype. " +
-                        "type:{} ns:{} short:{} fragment:'{}' path:'{}'",
-                            type, ns, typeFrag, fragment, path);
+                    logger.info("Both fragment or path found in shorttype. type:" + type + " ns:" 
+                    		+ ns + " short:" + typeFrag + " fragment:'" + fragment + "' path:'" + path + "'");
                 }
             }
         }

@@ -63,8 +63,8 @@ public class AnnotationResource {
             @DefaultValue("") @QueryParam("TIME") String timeStr,
             @DefaultValue("0.0") @QueryParam("DURATION") String durationStr) {
 
-        logger.debug("Querying annotations for resource: {}, time: {}, duration: {}",
-                resourceStr, timeStr, durationStr);
+        logger.debug("Querying annotations for resource: " + resourceStr 
+        		+ ", time: " + timeStr + ", duration: " + durationStr);
 
         if (resourceStr.isEmpty()) {
             logger.info("Bad request received. No resource provided.");
@@ -88,7 +88,7 @@ public class AnnotationResource {
             BigDecimal time = parseDecimal(timeStr, "time");
             BigDecimal duration = parseDecimal(durationStr, "duration");
 
-            logger.debug("Raw annotations query: {}, {}, {}", resource, time, duration);
+            logger.debug("Raw annotations query: " + resource + ", " + time + ", " + duration);
 
             String result = new SparqlToJsonString().performQuery(
                     prepareAnnotationByUtteranceQuery(resource, time, duration));
@@ -121,15 +121,15 @@ public class AnnotationResource {
             @DefaultValue("") @QueryParam("predicate") String predicateStr,
             @DefaultValue("") @QueryParam("object") String objectStr) {
 
-        logger.debug("Querying annotations by relationship subject: {}, predicate: {}, object: {}",
-                subjectStr, predicateStr, objectStr);
+        logger.debug("Querying annotations by relationship subject: " + subjectStr + 
+        		", predicate: " + predicateStr + ", object: " + objectStr);
 
         try {
             URI subject = resolveURI(subjectStr, "subject");
             URI predicate = resolveURI(predicateStr, "predicate");
             URI object = resolveURI(objectStr, "object");
 
-            logger.debug("Raw annotations query: {}, {}, {}", subject, predicate, object);
+            logger.debug("Raw annotations query: " + subject + ", " + predicate + ", " + object);
 
             String result = new SparqlToJsonString().performQuery(
                     prepareAnnotationByRelationshipQuery(subject, predicate, object));
@@ -296,7 +296,7 @@ public class AnnotationResource {
             this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_ANNOTATION_GRAPH,
                     userAnnotationGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insertRdfDescription graph:{}, rdf:{})", userAnnotationGraph, rdf, em);
+            logger.warn("Error performing insertRdfDescription graph:" + userAnnotationGraph + ", rdf:" + rdf + ")", em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)

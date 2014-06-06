@@ -99,7 +99,8 @@ public class RdfDataStoreDao {
 
                 URIImpl graphURI = new URIImpl(graph.toString());
                 if (!conn.hasStatement(null, null, null, true, graphURI)) {
-                    logger.debug("Attempt to delete statement ffrom non-existent graph: {} {} {}^^{} from {}", resource, property, object, objectType, graph);
+                    logger.debug("Attempt to delete statement ffrom non-existent graph: " 
+                    		+ resource + " " + property + " " + object + "^^" + objectType + " from " + graph);
                     return;
                 }
 

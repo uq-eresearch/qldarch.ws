@@ -47,7 +47,7 @@ public class TranscriptDescriptionResource {
             @QueryParam("PREFIX") String prefix,
             @QueryParam("ID") Set<String> idParam,
             @DefaultValue("") @QueryParam("IDLIST") String idlist) {
-        logger.debug("Querying PREFIX: {}, ID: {}, IDLIST: {}", prefix, idParam, idlist);
+        logger.debug("Querying PREFIX: " + prefix + ", ID: " + idParam + ", IDLIST: " + idlist);
         Set<String> ids = newHashSet(idParam);
         Iterables.addAll(ids, Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
         logger.debug("Raw ids: {}", ids);

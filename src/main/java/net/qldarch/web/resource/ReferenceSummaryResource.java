@@ -29,7 +29,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 
 import static com.google.common.collect.Sets.newHashSet;
-import static javax.ws.rs.core.Response.Status;
 
 @Path("/reference")
 public class ReferenceSummaryResource {
@@ -90,8 +89,8 @@ public class ReferenceSummaryResource {
             @DefaultValue("") @QueryParam("TIME") String timeStr,
             @DefaultValue("0.0") @QueryParam("DURATION") String durationStr) {
 
-        logger.debug("Querying references for resource: {}, time: {}, duration: {}",
-                resourceStr, timeStr, durationStr);
+        logger.debug("Querying references for resource: " + resourceStr 
+        		+ ", time: " + timeStr + ", duration: " + durationStr);
 
         if (resourceStr.isEmpty()) {
             logger.info("Bad request received. No resource provided.");
@@ -125,8 +124,7 @@ public class ReferenceSummaryResource {
                 .entity("QueryParam RESOURCE malformed")
                 .build();
         } catch (NumberFormatException en) {
-            logger.info("Malformed xsd:decimal submitted to references request: {}/{}",
-                timeStr, durationStr, en);
+            logger.info("Malformed xsd:decimal submitted to references request: " + timeStr + "/" + durationStr, en);
             return Response
                 .status(Status.BAD_REQUEST)
                 .type(MediaType.TEXT_PLAIN)
@@ -134,7 +132,7 @@ public class ReferenceSummaryResource {
                 .build();
         }
 
-        logger.debug("Raw references query: {}, {}, {}", resource, time, duration);
+        logger.debug("Raw references query: " + resource + ", " + time + ", " + duration);
 
         String result = new SparqlToJsonString().performQuery(
                 referenceQuery(resource, time, duration));
@@ -192,8 +190,8 @@ public class ReferenceSummaryResource {
         try {
             this.getRdfDao().insertRdfDescription(rdf, user, QAC_HAS_REFERENCE_GRAPH, userReferenceGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insertRdfDescription id:{}, graph:{}, rdf:{})",
-                    id, userReferenceGraph, rdf, em);
+            logger.warn("Error performing insertRdfDescription id:" + id + ", graph:" 
+            		+ userReferenceGraph + ", rdf:" + ")", em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)

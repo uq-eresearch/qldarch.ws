@@ -212,8 +212,8 @@ public class QldarchOntology {
                 Object object = validateObject(rawObject);
 
                 if (subject == null || predicate == null || object == null) {
-                    logger.debug("Error in ontology query result. Skipping entry ({}, {}, {})",
-                            rawSubject, rawPred, rawObject);
+                    logger.debug("Error in ontology query result. Skipping entry (" 
+                    			+ rawSubject + ", " + rawPred + ", " + rawObject + ")");
                     continue;
                 }
 
@@ -375,7 +375,7 @@ public class QldarchOntology {
 
     // FIXME: This MUST be broken up into a utility class of its own so it can be tested properly.
     public Value convertObject(URI property, Object object) throws MetadataRepositoryException {
-        logger.trace("Converting {} :: {} of class {}", property, object, object.getClass());
+        logger.trace("Converting " + property + " :: " + object + " of class " + object.getClass());
         Map<URI, Multimap<URI, Object>> properties = this.getProperties();
 
         if (!properties.containsKey(property)) {
@@ -479,12 +479,11 @@ public class QldarchOntology {
                     }
                 }
 
-                logger.trace("Property {} has class {}, Object {} has class {}",
-                        property, property.getClass(), object, object.getClass());
+                logger.trace("Property " + property + " has class " + property.getClass() + ", Object " 
+                		+ object + " has class " + object.getClass());
                 logger.trace("Property {} has description: {}", property, propertyDesc);
-                logger.info(
-                        "Object({}) for property({}) did not match any range declaration in {}",
-                        object, property, ranges);
+                logger.info("Object(" + object + ") for property(" + property + 
+                		") did not match any range declaration in {}" + ranges);
 
                 return new LiteralImpl(object.toString());
             }

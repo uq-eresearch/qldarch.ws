@@ -219,13 +219,13 @@ public class KnownPrefixes {
                 }
 
                 if (map.containsKey(prefix)) {
-                    logger.debug("Duplicate prefix string in result {}, first uri: {}, second uri: {}",
-                            prefix, map.get(prefix), uri);
+                    logger.debug("Duplicate prefix string in result " + prefix + ", first uri: " 
+                    		+ map.get(prefix) + ", second uri: " + uri);
                     continue;
                 } 
                 if (map.containsValue(uri)) {
-                    logger.debug("Duplicate uri in result {}, first prefix: {}, second prefix: {}",
-                            uri, map.inverse().get(uri), prefix);
+                    logger.debug("Duplicate uri in result " + uri + ", first prefix: " + map.inverse().get(uri) 
+                    		+ ", second prefix: " + prefix);
                     continue;
                 }
 
@@ -253,8 +253,7 @@ public class KnownPrefixes {
         Object datatype = literalPrefix.getDatatype();
 
         if (datatype != null && !datatype.equals(XSD_STRING)) {
-            logger.warn("prefix {} has non-string datatype {} for uri {}",
-                    literalPrefix, datatype, rawURI);
+            logger.warn("prefix " + literalPrefix + " has non-string datatype " + datatype + " for uri " + rawURI);
             return null;
         }
 
@@ -273,7 +272,7 @@ public class KnownPrefixes {
         try {
             return new URI(rawURI.toString());
         } catch (URISyntaxException eu) {
-            logger.warn("Invalid uri syntax({}) for prefix {}", rawURI, rawPrefix, eu);
+            logger.warn("Invalid uri syntax(" + rawURI + ") for prefix " + rawPrefix, eu);
             return null;
         }
     }

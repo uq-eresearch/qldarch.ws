@@ -38,7 +38,8 @@ public class SesameConnectionPool {
             repo.initialize();
         } catch (RepositoryException er) {
             logger.error("Unable to initialize repository: {}, {}",
-                    this.getServerURI(), this.getRepoName(), er);
+                    this.getServerURI(), this.getRepoName());
+            er.printStackTrace();
             throw new IllegalStateException("Unable to initalize repository", er);
         }
     }

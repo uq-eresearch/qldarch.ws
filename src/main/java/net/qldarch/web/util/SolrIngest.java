@@ -1,6 +1,8 @@
 package net.qldarch.web.util;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
@@ -22,6 +24,13 @@ import net.qldarch.web.resource.ExpressionResource;
 import net.qldarch.web.service.RdfDataStoreDao;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.tika.detect.DefaultDetector;
+import org.apache.tika.detect.Detector;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.Parser;
+import org.apache.tika.sax.BodyContentHandler;
 import org.dom4j.Document;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
@@ -29,6 +38,7 @@ import org.dom4j.io.OutputFormat;
 import org.dom4j.io.XMLWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xml.sax.ContentHandler;
 
 import com.google.common.io.CharStreams;
 
@@ -60,7 +70,7 @@ public class SolrIngest {
             
             File temp = new File(
             		"/var/www/html/files/article/" + article.get("source").replace("\"", ""));
-            
+
         	Document document = DocumentHelper.createDocument();
             Element root = document.addElement("add")
                 .addAttribute("commitWithin", "30000")
@@ -134,6 +144,7 @@ public class SolrIngest {
                 }
             } finally {
                 conn.disconnect();
+                temp.delete();
             }
         } catch (Exception e) {
         	e.printStackTrace();
@@ -157,6 +168,29 @@ public class SolrIngest {
 			
         	InputStream is = new FileInputStream(
         			"/var/www/html/files/" + article.get("source").replace("\"", ""));
+        	
+        	if (article.get("source").toString().replace("\"", "").endsWith(".doc")) {
+        		try {
+	        		ParseContext c = new ParseContext();
+	        		Detector detector = new DefaultDetector();
+	                Parser p = new AutoDetectParser(detector);
+	                c.set(Parser.class, p);
+	                OutputStream outputstream = new ByteArrayOutputStream();
+	                Metadata metadata = new Metadata();
+	        		
+	        		ContentHandler handler = new BodyContentHandler(outputstream);
+	                p.parse(is, handler, metadata, c); 
+	                is.close();
+	                
+	                String docText = outputstream.toString();
+	                
+	            	is = new ByteArrayInputStream(docText.getBytes());
+        		} catch (Exception e) { 
+                	e.printStackTrace();
+                	return;
+        		}
+        	}
+        	
         	TranscriptParser parser = new TranscriptParser(is);
         	Document document = DocumentHelper.createDocument();
         	 

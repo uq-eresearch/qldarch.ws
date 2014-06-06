@@ -25,14 +25,27 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.shiro.SecurityUtils;
 import org.apache.tika.Tika;
+import org.apache.tika.detect.DefaultDetector;
+import org.apache.tika.detect.Detector;
+import org.apache.tika.exception.TikaException;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.Parser;
+import org.apache.tika.sax.BodyContentHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xml.sax.ContentHandler;
+import org.xml.sax.SAXException;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -59,7 +72,6 @@ import static com.google.common.base.Optional.fromNullable;
 import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
-import static javax.ws.rs.core.Response.Status;
 import static net.qldarch.web.service.KnownURIs.*;
 
 @Path("/file")
@@ -131,7 +143,7 @@ public class FileSummaryResource {
             @QueryParam("ID") Set<String> idParam,
             @DefaultValue("") @QueryParam("IDLIST") String idlist) {
 
-        logger.debug("Querying PREFIX: {}, ID: {}, IDLIST: {}", prefix, idParam, idlist);
+        logger.debug("Querying PREFIX: " + prefix + ", ID: " + idParam + ", IDLIST: " + idlist);
 
         Set<String> ids = newHashSet(idParam);
         Iterables.addAll(ids, Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
@@ -268,9 +280,26 @@ public class FileSummaryResource {
         String transcriptLocationURI = "";
         if (isTranscript) {
         	InputStream is = new FileInputStream(tmpFile);
-        	TranscriptParser parser = new TranscriptParser(is);
         	PrintStream ps = null;
         	try {
+        		if (stripExt.toLowerCase().equals("doc")) {
+            		ParseContext c = new ParseContext();
+            		Detector detector = new DefaultDetector();
+                    Parser p = new AutoDetectParser(detector);
+                    c.set(Parser.class, p);
+                    OutputStream outputstream = new ByteArrayOutputStream();
+                    Metadata metadata = new Metadata();
+            		
+            		ContentHandler handler = new BodyContentHandler(outputstream);
+                    p.parse(is, handler, metadata, c); 
+                    
+                    String docText = outputstream.toString();
+                    is.close();
+                    
+                	is = new ByteArrayInputStream(docText.getBytes());
+            	}
+        		
+            	TranscriptParser parser = new TranscriptParser(is);
                 parser.parse();
             	File transcriptFile = new File(userFileDir, String.format("transcript/%s-%d-%s.%s.json",
                         user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
@@ -278,7 +307,7 @@ public class FileSummaryResource {
                 parser.printJson(ps);
                 
                 transcriptLocationURI = transcriptFile.toString().substring(this.archiveDir.toString().length() + 1);
-            } catch (IllegalStateException ei) {
+            } catch (Exception ei) {
             	ei.printStackTrace();
             	isTranscript = false;
             } finally {
@@ -370,7 +399,7 @@ public class FileSummaryResource {
             fileDesc.setURI(id);
             this.getRdfDao().insertRdfDescription(fileDesc, user, QAC_HAS_FILE_GRAPH, userFileGraph);
         } catch (MetadataRepositoryException em) {
-            logger.warn("Error performing insertRdfDescription graph:{}, rdf:{})", userFileGraph, fileDesc, em);
+            logger.warn("Error performing insertRdfDescription graph:" + userFileGraph + ", rdf:" + fileDesc + ")", em);
             return Response
                 .status(Status.INTERNAL_SERVER_ERROR)
                 .type(MediaType.TEXT_PLAIN)
