@@ -288,8 +288,8 @@ public class FileSummaryResource {
         
         Files.copy(file, tmpFile.toPath());
 
-        if (stripExt.toLowerCase().equals("jpg")) {
-        	autoRotateImage(tmpFile.getAbsolutePath(), "jpg");
+        if (stripExt.toLowerCase().equals("jpg") || stripExt.toLowerCase().equals("jpeg")) {
+        	autoRotateImage(tmpFile.getAbsolutePath(), stripExt);
         }
         
         boolean isTranscript = (stripExt.toLowerCase().equals("doc") || stripExt.toLowerCase().equals("txt"));
