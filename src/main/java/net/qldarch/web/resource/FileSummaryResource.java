@@ -74,6 +74,18 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
 import static net.qldarch.web.service.KnownURIs.*;
 
+import java.awt.geom.AffineTransform;
+import java.awt.image.AffineTransformOp;
+import java.awt.image.BufferedImage;
+
+import javax.imageio.ImageIO;
+
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.imaging.ImageProcessingException;
+import com.drew.metadata.MetadataException;
+import com.drew.metadata.exif.ExifIFD0Directory;
+import com.drew.metadata.jpeg.JpegDirectory;
+
 @Path("/file")
 public class FileSummaryResource {
     public static Logger logger = LoggerFactory.getLogger(FileSummaryResource.class);
@@ -276,6 +288,10 @@ public class FileSummaryResource {
         
         Files.copy(file, tmpFile.toPath());
 
+        if (stripExt.toLowerCase().equals("jpg")) {
+        	autoRotateImage(tmpFile.getAbsolutePath(), "jpg");
+        }
+        
         boolean isTranscript = (stripExt.toLowerCase().equals("doc") || stripExt.toLowerCase().equals("txt"));
         String transcriptLocationURI = "";
         if (isTranscript) {
@@ -330,7 +346,7 @@ public class FileSummaryResource {
         String thumbmnailLocationURI = "";
         if (isImage) {
             try {
-                Files.copy(destFile.toPath(), fullFile.toPath());
+                Files.copy(tmpFile.toPath(), fullFile.toPath());
                 
             	File webFile = new File(userFileDir, String.format("web/%s-%d-%s.thumbnail.%s",
                         user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
@@ -415,6 +431,93 @@ public class FileSummaryResource {
         return Response.ok().entity(fileDesc).build();
     }
 
+    public void autoRotateImage(String path, String extension) {
+    	try {
+	        File imageFile = new File(path);
+	        BufferedImage originalImage = ImageIO.read(imageFile);
+	
+	        com.drew.metadata.Metadata metadata = ImageMetadataReader.readMetadata(imageFile);
+	        ExifIFD0Directory exifIFD0Directory = metadata.getDirectory(ExifIFD0Directory.class);
+	        JpegDirectory jpegDirectory = (JpegDirectory) metadata.getDirectory(JpegDirectory.class);
+	
+	        int orientation = 1;
+	        try {
+	            orientation = exifIFD0Directory.getInt(ExifIFD0Directory.TAG_ORIENTATION);
+	        } catch (Exception ex) {
+	            ex.printStackTrace();
+	        }
+	
+	        int width = jpegDirectory.getImageWidth();
+	        int height = jpegDirectory.getImageHeight();
+	        int tmp = 0;
+	        
+	        AffineTransform affineTransform = new AffineTransform();
+	        
+	        switch (orientation) {
+	        case 1:
+	            return;
+	        case 2: // Flip X
+	            affineTransform.scale(-1.0, 1.0);
+	            affineTransform.translate(-width, 0);
+	            break;
+	        case 3: // PI rotation
+	            affineTransform.translate(width, height);
+	            affineTransform.rotate(Math.PI);
+	            break;
+	        case 4: // Flip Y
+	            affineTransform.scale(1.0, -1.0);
+	            affineTransform.translate(0, -height);
+	            break;
+	        case 5: // - PI/2 and Flip X
+	            affineTransform.rotate(-Math.PI / 2);
+	            affineTransform.scale(-1.0, 1.0);
+	        	tmp = width;
+	        	width = height;
+	        	height = tmp;
+	            break;
+	        case 6: // -PI/2 and -width
+	            affineTransform.translate(height, 0);
+	            affineTransform.rotate(Math.PI / 2);
+	        	tmp = width;
+	        	width = height;
+	        	height = tmp;
+	            break;
+	        case 7: // PI/2 and Flip
+	            affineTransform.scale(-1.0, 1.0);
+	            affineTransform.translate(-height, 0);
+	            affineTransform.translate(0, width);
+	            affineTransform.rotate(3 * Math.PI / 2);
+	        	tmp = width;
+	        	width = height;
+	        	height = tmp;
+	            break;
+	        case 8: // PI / 2
+	            affineTransform.translate(0, width);
+	            affineTransform.rotate(3 * Math.PI / 2);
+	        	tmp = width;
+	        	width = height;
+	        	height = tmp;
+	            break;
+	        default:
+	            return;
+	        }       
+	
+	        AffineTransformOp affineTransformOp = new AffineTransformOp(affineTransform, AffineTransformOp.TYPE_BILINEAR);  
+	        BufferedImage destinationImage = new BufferedImage(width, height, originalImage.getType());
+	        destinationImage = affineTransformOp.filter(originalImage, destinationImage);
+	        ImageIO.write(destinationImage, extension, new File(path));
+    	} catch (IOException e) {
+            logger.error("IOException: {}", e);
+            e.printStackTrace();
+    	} catch (ImageProcessingException e) {
+            logger.error("ImageProcessingException: {}", e);
+            e.printStackTrace();
+    	} catch (MetadataException e) {
+            logger.error("MetadataException: {}", e);
+            e.printStackTrace();
+    	}
+    }
+    
     public void setRdfDao(RdfDataStoreDao rdfDao) {
         this.rdfDao = rdfDao;
     }

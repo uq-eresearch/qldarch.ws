@@ -527,16 +527,18 @@ public class ExpressionResource {
         QldarchOntology ont = this.getRdfDao().getOntology();
 
         Multimap<URI, Object> entity = ont.findByURI(type);
-        Collection<Object> requiredPredicates = entity.get(QA_REQUIRED);
-        for (Object o : requiredPredicates) {
-            if (o instanceof URI) {
-                if (rdf.getValues((URI)o).isEmpty()) {
-                    logger.info("create:entity received missing required property: {}", o);
-                    throw new MetadataRepositoryException("Missing required property " + o);
-                }
-            } else {
-                logger.warn("Required property {} for type {} was not a URI", o, type);
-            }
+        if (entity != null) {
+	        Collection<Object> requiredPredicates = entity.get(QA_REQUIRED);
+	        for (Object o : requiredPredicates) {
+	            if (o instanceof URI) {
+	                if (rdf.getValues((URI)o).isEmpty()) {
+	                    logger.info("create:entity received missing required property: {}", o);
+	                    throw new MetadataRepositoryException("Missing required property " + o);
+	                }
+	            } else {
+	                logger.warn("Required property {} for type {} was not a URI", o, type);
+	            }
+	        }
         }
     }
 
