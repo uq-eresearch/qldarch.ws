@@ -1,40 +1,55 @@
 package net.qldarch.web.resource;
 
-import net.qldarch.web.model.QldarchOntology;
-import net.qldarch.web.model.RdfDescription;
-import net.qldarch.web.model.User;
-import net.qldarch.web.service.*;
-import net.qldarch.web.util.Functions;
-import net.qldarch.web.util.ResourceUtils;
-import net.qldarch.web.util.SparqlToJsonString;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Multimap;
-
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.stringtemplate.v4.STGroupFile;
-import org.openrdf.model.Statement;
+import static com.google.common.collect.Collections2.transform;
+import static com.google.common.collect.Sets.newHashSet;
+import static net.qldarch.web.service.KnownURIs.QAC_HAS_ENTITY_GRAPH;
+import static net.qldarch.web.service.KnownURIs.QA_ASSERTED_BY;
+import static net.qldarch.web.service.KnownURIs.QA_ASSERTION_DATE;
+import static net.qldarch.web.service.KnownURIs.QA_EVIDENCE;
+import static net.qldarch.web.service.KnownURIs.QA_EVIDENCE_TYPE;
+import static net.qldarch.web.service.KnownURIs.QA_REQUIRED;
+import static net.qldarch.web.service.KnownURIs.RDF_TYPE;
+import static net.qldarch.web.util.ResourceUtils.badRequest;
+import static net.qldarch.web.util.ResourceUtils.internalError;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
-import javax.ws.rs.*;
-import javax.ws.rs.core.Response;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import static com.google.common.collect.Collections2.transform;
-import static com.google.common.collect.Sets.newHashSet;
-import static java.util.Collections.singletonList;
+import net.qldarch.web.model.QldarchOntology;
+import net.qldarch.web.model.RdfDescription;
+import net.qldarch.web.model.User;
+import net.qldarch.web.service.MetadataRepositoryException;
+import net.qldarch.web.service.RdfDataStoreDao;
+import net.qldarch.web.util.Functions;
+import net.qldarch.web.util.SparqlTemplate;
+import net.qldarch.web.util.SparqlToJsonString;
 
-import static net.qldarch.web.service.KnownURIs.*;
-import static net.qldarch.web.util.CollectionUtils.asIterable;
-import static net.qldarch.web.util.ResourceUtils.*;
+import org.apache.shiro.SecurityUtils;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Splitter;
+import com.google.common.collect.Multimap;
 
 @Path("/entity")
 public class EntitySummaryResource {
@@ -42,34 +57,6 @@ public class EntitySummaryResource {
 
     private RdfDataStoreDao rdfDao;
 
-    private static final STGroupFile ENTITY_QUERIES = new STGroupFile("queries/Entities.sparql.stg");
-
-    public static String prepareEntitiesByTypesQuery(Collection<URI> types, long since,
-             boolean includeSubClass, boolean includeSuperClass, boolean summary) {
-
-        String query = ENTITY_QUERIES.getInstanceOf("byType")
-                .add("types", types)
-                .add("incSubClass", includeSubClass)
-                .add("incSuperClass", includeSuperClass)
-                .add("summary", summary)
-                .render();
-
-        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
-
-        return query;
-    }
-   
-    public static String prepareMergeUpdate(String intoResource, String fromResource) {
-        String query = ENTITY_QUERIES.getInstanceOf("merge")
-                .add("intoResource", intoResource)
-                .add("fromResource", fromResource)
-                .render();
-
-        logger.debug("EntitySummaryResource performing SPARQL update: {}", query);
-
-        return query;
-    }
-    
     @PUT
     @Path("merge")
     public Response merge (
@@ -84,7 +71,8 @@ public class EntitySummaryResource {
         }
         
         try {
-        	this.getRdfDao().updateForRdfResources(prepareMergeUpdate(intoResource, fromResource));
+          this.getRdfDao().updateForRdfResources(
+              SparqlTemplate.instance().prepareMergeUpdate(intoResource, fromResource));
         } catch (MetadataRepositoryException e) {
         	e.printStackTrace();
         	return Response
@@ -94,29 +82,7 @@ public class EntitySummaryResource {
         }
     	return Response.status(Status.OK).build();
     }
-    
-    public static String prepareSearchByUserQuery(URI userExpressionID) {
-        String query = ENTITY_QUERIES.getInstanceOf("searchByUserId")
-                .add("id", userExpressionID)
-                .render();
 
-        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
-
-        return query;
-    }
-    
-    public static String prepareSearchQuery(String searchString, Collection<URI> types, boolean restrictType) {
-       String query = ENTITY_QUERIES.getInstanceOf("searchByLabelIds")
-               .add("searchString", searchString)
-               .add("types", types)
-               .add("restrictType", restrictType)
-               .render();
-
-       logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
-
-       return query;
-    }
-    
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("search")
@@ -130,8 +96,8 @@ public class EntitySummaryResource {
         
         logger.debug("Querying search(" + searchString + "," + typeURIs + "," + !typeURIs.isEmpty() + ")");
         
-        return new SparqlToJsonString().performQuery(
-        		prepareSearchQuery(searchString, typeURIs, !typeURIs.isEmpty()));
+        return new SparqlToJsonString().performQuery(SparqlTemplate.instance().prepareSearchQuery(
+            searchString, typeURIs, !typeURIs.isEmpty()));
     }
     
     @GET
@@ -157,7 +123,7 @@ public class EntitySummaryResource {
     	URI userFileGraph = user.getEntityGraph();
         
         return new SparqlToJsonString().performQuery(
-        		prepareSearchByUserQuery(userFileGraph));
+            SparqlTemplate.instance().prepareSearchByUserQuery(userFileGraph));
     }
     
     /**
@@ -195,24 +161,8 @@ public class EntitySummaryResource {
         logger.debug("Raw types: {}", typeURIs);
 
         return new SparqlToJsonString().performQuery(
-                prepareEntitiesByTypesQuery(typeURIs, since, includeSubClass, includeSuperClass, summary));
-    }
-
-    public static String findByIds(Collection<URI> ids, boolean summary) {
-        if (ids.size() < 1) {
-            throw new IllegalArgumentException("Empty id collection passed to findEvidenceByIds()");
-        }
-
-        logger.debug("EntityResource performing SPARQL query: {}, {}", summary, ids);
-        logger.debug("{}", (ids == null));
-        String query = ENTITY_QUERIES.getInstanceOf("byIds")
-                .add("ids", ids)
-                .add("summary", summary)
-                .render();
-
-        logger.debug("EntityResource performing SPARQL query: {}", query);
-
-        return query;
+            SparqlTemplate.instance().prepareEntitiesByTypesQuery(
+                typeURIs, since, includeSubClass, includeSuperClass, summary));
     }
 
     @GET
@@ -232,7 +182,8 @@ public class EntitySummaryResource {
 
         logger.debug("Raw ids: {}", idURIs);
 
-        return new SparqlToJsonString().performQuery(findByIds(idURIs, summary));
+        return new SparqlToJsonString().performQuery(
+            SparqlTemplate.instance().findByIds(idURIs, summary));
     }
  
     @POST
@@ -333,10 +284,7 @@ public class EntitySummaryResource {
 
         List<URI> entityURIs = null;
         try {
-            String query = ENTITY_QUERIES.getInstanceOf("confirmEntityIds")
-                    .add("ids", idURIs)
-                    .render();
-
+            String query = SparqlTemplate.instance().confirmEntityIds(idURIs);
             logger.debug("EntityResource DELETE evidence performing SPARQL id-query:\n{}", query);
 
             entityURIs = this.getRdfDao().queryForRdfResources(query);
@@ -393,10 +341,7 @@ public class EntitySummaryResource {
         
         List<URI> entityURIs = null;
         try {
-            String query = ENTITY_QUERIES.getInstanceOf("confirmEntityIds")
-                    .add("ids", idURIs)
-                    .render();
-
+            String query = SparqlTemplate.instance().confirmEntityIds(idURIs);
             logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
 
             entityURIs = this.getRdfDao().queryForRdfResources(query);
@@ -412,12 +357,8 @@ public class EntitySummaryResource {
         
         List<URI> graphURIs = null;
         try {
-            String query = ENTITY_QUERIES.getInstanceOf("extractGraphContext")
-                    .add("ids", idURIs)
-                    .render();
-
+            String query = SparqlTemplate.instance().extractGraphContext(idURIs);
             logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
-
             graphURIs = this.getRdfDao().queryForRdfResources(query);
         } catch (MetadataRepositoryException e) {
             logger.warn("Error extracting graph from entity id: {})", id);
