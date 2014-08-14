@@ -1,61 +1,59 @@
 package net.qldarch.web.resource;
 
-import net.qldarch.av.parser.TranscriptParser;
-import net.qldarch.web.model.QldarchOntology;
-import net.qldarch.web.model.RdfDescription;
-import net.qldarch.web.model.User;
-import net.qldarch.web.service.*;
-import net.qldarch.web.util.Functions;
-import net.qldarch.web.util.SolrIngest;
-import net.qldarch.web.util.SparqlToJsonString;
+import static com.google.common.base.Functions.toStringFunction;
+import static com.google.common.collect.Collections2.transform;
+import static com.google.common.collect.Sets.newHashSet;
+import static net.qldarch.web.service.KnownURIs.QAC_HAS_EXPRESSION_GRAPH;
+import static net.qldarch.web.service.KnownURIs.QA_ASSERTED_BY;
+import static net.qldarch.web.service.KnownURIs.QA_ASSERTION_DATE;
+import static net.qldarch.web.service.KnownURIs.QA_EVIDENCE;
+import static net.qldarch.web.service.KnownURIs.QA_EVIDENCE_TYPE;
+import static net.qldarch.web.service.KnownURIs.QA_REQUIRED;
+import static net.qldarch.web.service.KnownURIs.RDF_TYPE;
+import static net.qldarch.web.util.ResourceUtils.badRequest;
+import static net.qldarch.web.util.ResourceUtils.internalError;
 
-import org.codehaus.jackson.map.ObjectMapper;
-import org.dom4j.Document;
-import org.dom4j.DocumentHelper;
-import org.dom4j.Element;
-
-import com.google.common.base.Joiner;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Multimap;
-
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.stringtemplate.v4.STGroupFile;
-
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
-import javax.ws.rs.POST;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import static com.google.common.base.Functions.toStringFunction;
-import static com.google.common.collect.Collections2.transform;
-import static com.google.common.collect.Sets.newHashSet;
-import static net.qldarch.web.service.KnownURIs.*;
-import static net.qldarch.web.util.ResourceUtils.badRequest;
-import static net.qldarch.web.util.ResourceUtils.forbidden;
-import static net.qldarch.web.util.ResourceUtils.internalError;
+import net.qldarch.web.model.QldarchOntology;
+import net.qldarch.web.model.RdfDescription;
+import net.qldarch.web.model.User;
+import net.qldarch.web.service.MetadataRepositoryException;
+import net.qldarch.web.service.RdfDataStoreDao;
+import net.qldarch.web.util.Functions;
+import net.qldarch.web.util.SolrIngest;
+import net.qldarch.web.util.SparqlTemplate;
+import net.qldarch.web.util.SparqlToJsonString;
+
+import org.apache.shiro.SecurityUtils;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.stringtemplate.v4.ST;
+
+import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Multimap;
 
 /* FIXME: Consider refactor with EntitySummaryResource */
 
@@ -65,7 +63,8 @@ public class ExpressionResource {
 
     public static String USER_EXPRESSION_GRAPH_FORMAT = "http://qldarch.net/users/%s/expressions";
 
-    private static final STGroupFile EXPRESSION_QUERIES = new STGroupFile("queries/Expressions.sparql.stg");
+    private static final SparqlTemplate EXPRESSION_QUERIES = 
+        new SparqlTemplate("queries/Expressions.sparql.stg");
     
     private RdfDataStoreDao rdfDao;
 
@@ -114,26 +113,29 @@ public class ExpressionResource {
         return query;
     }
 
-    public static String prepareSearchQuery(String searchString, Collection<URI> types, boolean restrictType) {
-        String query = EXPRESSION_QUERIES.getInstanceOf("searchByLabelIds")
-                .add("searchString", searchString)
-                .add("types", types)
-                .add("restrictType", restrictType)
-                .render();
-
-        logger.debug("ExpressionSummaryResource performing SPARQL query: {}", query);
-
-        return query;
+    private String prepareSearchQuery(final String searchString,
+        final Collection<URI> types, final boolean restrictType) {
+      String query = EXPRESSION_QUERIES.render("searchByLabelIds", new SparqlTemplate.Binder() {
+        
+        @Override
+        public void bind(ST template) {
+          template.add("searchString", searchString).add(
+              "types", types).add("restrictType", restrictType);
+        }
+      });
+      logger.debug("ExpressionSummaryResource performing SPARQL query: {}", query);
+      return query;
     }
 
-    public static String prepareSearchByUserQuery(URI userExpressionID) {
-        String query = EXPRESSION_QUERIES.getInstanceOf("searchByUserId")
-                .add("id", userExpressionID)
-                .render();
-
-        logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
-
-        return query;
+    private String prepareSearchByUserQuery(final URI userExpressionID) {
+      String query = EXPRESSION_QUERIES.render("searchByUserId", new SparqlTemplate.Binder() {
+        @Override
+        public void bind(ST template) {
+          template.add("id", userExpressionID);
+        }
+      });
+      logger.debug("EntitySummaryResource performing SPARQL query: {}", query);
+      return query;
     }
     
      @GET
@@ -382,14 +384,17 @@ public class ExpressionResource {
                 Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
         if (!id.isEmpty()) idStrs.add(id);
 
-        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        final Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
 
         List<URI> entityURIs = null;
         try {
-            String query = EXPRESSION_QUERIES.getInstanceOf("confirmExpressionIds")
-                    .add("ids", idURIs)
-                    .render();
-
+            String query = EXPRESSION_QUERIES.render("confirmExpressionIds",
+                new SparqlTemplate.Binder() {
+              @Override
+              public void bind(ST template) {
+                template.add("ids", idURIs);
+              }
+            });
             logger.debug("EntityResource DELETE evidence performing SPARQL id-query:\n{}", query);
 
             entityURIs = this.getRdfDao().queryForRdfResources(query);
@@ -442,13 +447,17 @@ public class ExpressionResource {
         	idStrs.add(id);
         }
 
-        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        final Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
         
         List<URI> entityURIs = null;
         try {
-        	String query = EXPRESSION_QUERIES.getInstanceOf("confirmExpressionIds")
-                    .add("ids", idURIs)
-                    .render();
+          String query = EXPRESSION_QUERIES.render("confirmExpressionIds",
+              new SparqlTemplate.Binder() {
+            @Override
+            public void bind(ST template) {
+              template.add("ids", idURIs);
+            }
+          });
 
             logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
 
@@ -465,9 +474,13 @@ public class ExpressionResource {
         
         List<URI> graphURIs = null;
         try {
-            String query = EXPRESSION_QUERIES.getInstanceOf("extractGraphContext")
-                    .add("ids", idURIs)
-                    .render();
+            String query = EXPRESSION_QUERIES.render("extractGraphContext",
+                new SparqlTemplate.Binder() {
+              @Override
+              public void bind(ST template) {
+                template.add("ids", idURIs);
+              }
+            });
 
             logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
 
@@ -490,9 +503,9 @@ public class ExpressionResource {
             logger.info("Bad request received. No rdf:type provided: {}", rdf);
             return badRequest("No rdf:type provided");
         }
-        URI uri = null;
+
         try {
-        	uri = new URI(id);
+          new URI(id);
         } catch (URISyntaxException em) {
             logger.warn("Error performing passing id as URI:{})", id);
             return internalError("Error performing update");

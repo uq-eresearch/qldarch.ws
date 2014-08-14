@@ -1,6 +1,32 @@
 package net.qldarch.web.resource;
 
-import com.google.common.base.Splitter;
+import static com.google.common.collect.Collections2.transform;
+import static com.google.common.collect.Sets.newHashSet;
+import static net.qldarch.web.service.KnownURIs.QAC_HAS_ANNOTATION_GRAPH;
+import static net.qldarch.web.service.KnownURIs.QA_ASSERTED_BY;
+import static net.qldarch.web.service.KnownURIs.QA_ASSERTION_DATE;
+import static net.qldarch.web.service.KnownURIs.QA_EVIDENCE;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.net.URI;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
@@ -11,29 +37,13 @@ import net.qldarch.web.util.Functions;
 import net.qldarch.web.util.SparqlTemplate;
 import net.qldarch.web.util.SparqlToJsonString;
 
-import org.codehaus.jackson.map.ObjectMapper;
 import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.stringtemplate.v4.STGroupFile;
+import org.stringtemplate.v4.ST;
 
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.net.URI;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
-
-import javax.ws.rs.*;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.MediaType;
-
-import static com.google.common.collect.Collections2.transform;
-import static com.google.common.collect.Sets.newHashSet;
-import static javax.ws.rs.core.Response.Status;
-import static net.qldarch.web.service.KnownURIs.*;
+import com.google.common.base.Splitter;
 
 @Path("/annotation")
 public class AnnotationResource {
@@ -41,6 +51,9 @@ public class AnnotationResource {
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
 
     public static String SHARED_ANNOTATION_GRAPH = "http://qldarch.net/rdf/2013-09/annotations";
+
+    private static final SparqlTemplate ANNOTATION_QUERIES =
+        new SparqlTemplate("queries/Annotations.sparql.stg");
 
     private RdfDataStoreDao rdfDao;
 
@@ -72,15 +85,17 @@ public class AnnotationResource {
         }
 
         try {
-            URI resource = resolveURI(resourceStr, "resource");
-            BigDecimal time = parseDecimal(timeStr, "time");
-            BigDecimal duration = parseDecimal(durationStr, "duration");
-
+            final URI resource = resolveURI(resourceStr, "resource");
+            final BigDecimal time = parseDecimal(timeStr, "time");
+            final BigDecimal duration = parseDecimal(durationStr, "duration");
             logger.debug("Raw annotations query: " + resource + ", " + time + ", " + duration);
-
-            String result = new SparqlToJsonString().performQuery(SparqlTemplate.instance()
-                .prepareAnnotationByUtteranceQuery(resource, time, duration));
-
+            String query = ANNOTATION_QUERIES.render("byUtterance", new SparqlTemplate.Binder() {
+              @Override
+              public void bind(ST template) {
+                template.add("resource", resource).add("lower", time).add("upper", duration);
+              }
+            });
+            String result = new SparqlToJsonString().performQuery(query);
             return Response.ok()
                 .entity(result)
                 .build();
@@ -101,15 +116,18 @@ public class AnnotationResource {
         		", predicate: " + predicateStr + ", object: " + objectStr);
 
         try {
-            URI subject = resolveURI(subjectStr, "subject");
-            URI predicate = resolveURI(predicateStr, "predicate");
-            URI object = resolveURI(objectStr, "object");
+            final URI subject = resolveURI(subjectStr, "subject");
+            final URI predicate = resolveURI(predicateStr, "predicate");
+            final URI object = resolveURI(objectStr, "object");
 
             logger.debug("Raw annotations query: " + subject + ", " + predicate + ", " + object);
-
-            String result = new SparqlToJsonString().performQuery(SparqlTemplate.instance()
-                .prepareAnnotationByRelationshipQuery(subject, predicate, object));
-
+            String query = ANNOTATION_QUERIES.render("byRelationship", new SparqlTemplate.Binder() {
+              @Override
+              public void bind(ST template) {
+                template.add("subject", subject).add("predicate", predicate).add("object", object);
+              }
+            });
+            String result = new SparqlToJsonString().performQuery(query);
             return Response.ok()
                     .entity(result)
                     .build();
@@ -143,18 +161,40 @@ public class AnnotationResource {
                     .build();
         }
 
-        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
-        Collection<URI> relURIs = transform(relIdStrs, Functions.toResolvedURI());
+        final Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        final Collection<URI> relURIs = transform(relIdStrs, Functions.toResolvedURI());
 
         String result = relURIs.isEmpty() ?
-            new SparqlToJsonString().performQuery(
-                SparqlTemplate.instance().findEvidenceByIds(idURIs)) :
-            new SparqlToJsonString().performQuery(
-                SparqlTemplate.instance().findEvidenceByRelationships(relURIs));
-
+            new SparqlToJsonString().performQuery(findEvidenceByIds(idURIs)) :
+            new SparqlToJsonString().performQuery(findEvidenceByRelationships(relURIs));
         return Response.ok()
                 .entity(result)
                 .build();
+    }
+
+    private String findEvidenceByIds(final Collection<URI> ids) {
+      if (ids.size() < 1) {
+        throw new IllegalArgumentException("Empty id collection passed to findEvidenceByIds()");
+      }
+      return ANNOTATION_QUERIES.render("byEvidenceIds", new SparqlTemplate.Binder() {
+        @Override
+        public void bind(ST template) {
+          template.add("ids", ids);
+        }
+      });
+    }
+
+    private String findEvidenceByRelationships(final Collection<URI> ids) {
+      if (ids.size() < 1) {
+        throw new IllegalArgumentException(
+            "Empty id collection passed to findEvidenceByRelationships()");
+      }
+      return ANNOTATION_QUERIES.render("byRelationships", new SparqlTemplate.Binder() {
+        @Override
+        public void bind(ST template) {
+          template.add("ids", ids);
+        }
+      });
     }
 
     private URI resolveURI(String uriStr, String description) throws ResourceFailedException {
@@ -280,11 +320,17 @@ public class AnnotationResource {
                 Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
         if (!id.isEmpty()) idStrs.add(id);
 
-        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        final Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
 
         List<URI> evidenceURIs = null;
         try {
-            String query = SparqlTemplate.instance().confirmEvidenceIds(idURIs);
+            String query = ANNOTATION_QUERIES.render(
+                "confirmEvidenceIds", new SparqlTemplate.Binder() {
+              @Override
+              public void bind(ST template) {
+                template.add("ids", idURIs);
+              }
+            });
 
             logger.debug("AnnotationResource DELETE evidence performing SPARQL id-query:\n{}", query);
 
@@ -322,7 +368,7 @@ public class AnnotationResource {
 
         List<URI> orphaned = null;
         try {
-            String query = SparqlTemplate.instance().unevidencedRelationships();
+            String query = ANNOTATION_QUERIES.render("unevidencedRelationships");
 
             logger.debug("AnnotationResource DELETE evidence performing SPARQL query:\n{}", query);
 

@@ -47,6 +47,7 @@ import org.apache.shiro.SecurityUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.stringtemplate.v4.ST;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Multimap;
@@ -55,13 +56,16 @@ import com.google.common.collect.Multimap;
 public class EntitySummaryResource {
     public static Logger logger = LoggerFactory.getLogger(EntitySummaryResource.class);
 
+    private static final SparqlTemplate ENTITY_QUERIES = 
+        new SparqlTemplate("queries/Entities.sparql.stg");
+
     private RdfDataStoreDao rdfDao;
 
     @PUT
     @Path("merge")
     public Response merge (
-            @DefaultValue("") @QueryParam("intoResource") String intoResource,
-            @DefaultValue("") @QueryParam("fromResource") String fromResource) {
+            @DefaultValue("") @QueryParam("intoResource") final String intoResource,
+            @DefaultValue("") @QueryParam("fromResource") final String fromResource) {
         if (!SecurityUtils.getSubject().isPermitted("entity:delete")) {
         	return Response
                     .status(Status.FORBIDDEN)
@@ -71,8 +75,13 @@ public class EntitySummaryResource {
         }
         
         try {
-          this.getRdfDao().updateForRdfResources(
-              SparqlTemplate.instance().prepareMergeUpdate(intoResource, fromResource));
+          String query = ENTITY_QUERIES.render("merge", new SparqlTemplate.Binder() {
+            @Override
+            public void bind(ST template) {
+              template.add("intoResource", intoResource).add("fromResource", fromResource);
+            }
+          });
+          this.getRdfDao().updateForRdfResources(query);
         } catch (MetadataRepositoryException e) {
         	e.printStackTrace();
         	return Response
@@ -87,17 +96,22 @@ public class EntitySummaryResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Path("search")
     public String search(
-            @DefaultValue("") @QueryParam("searchString") String searchString,
+            @DefaultValue("") @QueryParam("searchString") final String searchString,
             @DefaultValue("") @QueryParam("type") String type) {
         Set<String> typeStrs = newHashSet(
                 Splitter.on(',').trimResults().omitEmptyStrings().split(type));
         
-        Collection<URI> typeURIs = transform(typeStrs, Functions.toResolvedURI());
+        final Collection<URI> typeURIs = transform(typeStrs, Functions.toResolvedURI());
         
         logger.debug("Querying search(" + searchString + "," + typeURIs + "," + !typeURIs.isEmpty() + ")");
-        
-        return new SparqlToJsonString().performQuery(SparqlTemplate.instance().prepareSearchQuery(
-            searchString, typeURIs, !typeURIs.isEmpty()));
+        String query = ENTITY_QUERIES.render("searchByLabelIds", new SparqlTemplate.Binder() {
+          @Override
+          public void bind(ST template) {
+            template.add("searchString", searchString).add(
+                "types", typeURIs).add("restrictType", !typeURIs.isEmpty());
+          }
+        });
+        return new SparqlToJsonString().performQuery(query);
     }
     
     @GET
@@ -118,12 +132,15 @@ public class EntitySummaryResource {
     @Path("user")
     public String search(
             @DefaultValue("") @QueryParam("ID") String id) {
-    	User user = new User(id);
-    	
-    	URI userFileGraph = user.getEntityGraph();
-        
-        return new SparqlToJsonString().performQuery(
-            SparqlTemplate.instance().prepareSearchByUserQuery(userFileGraph));
+      User user = new User(id);
+      final URI userFileGraph = user.getEntityGraph();
+      String query = ENTITY_QUERIES.render("searchByUserId", new SparqlTemplate.Binder() {
+        @Override
+        public void bind(ST template) {
+          template.add("id", userFileGraph);
+        }
+      });
+      return new SparqlToJsonString().performQuery(query);
     }
     
     /**
@@ -147,7 +164,7 @@ public class EntitySummaryResource {
     }
 
     public String findByType(String type, String typelist, long since,
-            boolean includeSubClass, boolean includeSuperClass, boolean summary) {
+            final boolean includeSubClass, final boolean includeSuperClass, final boolean summary) {
         logger.debug("Querying summary(" + summary+ ") by type: " + type + ", typelist: " + typelist);
 
         if (since < 0) since = 0;  // Sanitise since
@@ -156,13 +173,18 @@ public class EntitySummaryResource {
                 Splitter.on(',').trimResults().omitEmptyStrings().split(typelist));
         if (!type.isEmpty()) typeStrs.add(type);
 
-        Collection<URI> typeURIs = transform(typeStrs, Functions.toResolvedURI());
+        final Collection<URI> typeURIs = transform(typeStrs, Functions.toResolvedURI());
 
         logger.debug("Raw types: {}", typeURIs);
 
-        return new SparqlToJsonString().performQuery(
-            SparqlTemplate.instance().prepareEntitiesByTypesQuery(
-                typeURIs, since, includeSubClass, includeSuperClass, summary));
+        String query = ENTITY_QUERIES.render("byType", new SparqlTemplate.Binder() {
+          @Override
+          public void bind(ST template) {
+            template.add("types", typeURIs).add("incSubClass", includeSubClass).add(
+                "incSuperClass", includeSuperClass).add("summary", summary);
+          }
+        });
+        return new SparqlToJsonString().performQuery(query);
     }
 
     @GET
@@ -171,19 +193,25 @@ public class EntitySummaryResource {
     public String performGet(
             @DefaultValue("") @QueryParam("ID") String id,
             @DefaultValue("") @QueryParam("IDLIST") String idlist,
-            @DefaultValue("false") @QueryParam("SUMMARY") boolean summary) {
+            @DefaultValue("false") @QueryParam("SUMMARY") final boolean summary) {
         logger.debug("Querying summary(" + summary + ") by id: " + id + ", idlist: " + idlist);
 
         Set<String> idStrs = newHashSet(
                 Splitter.on(',').trimResults().omitEmptyStrings().split(idlist));
         if (!id.isEmpty()) idStrs.add(id);
 
-        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
-
+        final Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        if (idURIs.size() < 1) {
+          throw new IllegalArgumentException("Empty id collection passed to findEvidenceByIds()");
+        }
         logger.debug("Raw ids: {}", idURIs);
-
-        return new SparqlToJsonString().performQuery(
-            SparqlTemplate.instance().findByIds(idURIs, summary));
+        String query = ENTITY_QUERIES.render("byIds", new SparqlTemplate.Binder() {
+          @Override
+          public void bind(ST template) {
+            template.add("ids", idURIs).add("summary", summary);
+          }
+        });
+        return new SparqlToJsonString().performQuery(query);
     }
  
     @POST
@@ -284,7 +312,7 @@ public class EntitySummaryResource {
 
         List<URI> entityURIs = null;
         try {
-            String query = SparqlTemplate.instance().confirmEntityIds(idURIs);
+            String query = confirmEntityIds(idURIs);
             logger.debug("EntityResource DELETE evidence performing SPARQL id-query:\n{}", query);
 
             entityURIs = this.getRdfDao().queryForRdfResources(query);
@@ -314,6 +342,14 @@ public class EntitySummaryResource {
                 .build();
     }
 
+    private String confirmEntityIds(final Collection<URI> idURIs) {
+      return ENTITY_QUERIES.render("confirmEntityIds", new SparqlTemplate.Binder() {
+        @Override
+        public void bind(ST template) {
+          template.add("ids", idURIs);
+        }
+      });
+    }
 
     // FIXME: Refactor SesameConnectionPool to allow RdfDataStoreDao to offer user-delimited transactions
     @PUT
@@ -337,11 +373,11 @@ public class EntitySummaryResource {
         	idStrs.add(id);
         }
 
-        Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
+        final Collection<URI> idURIs = transform(idStrs, Functions.toResolvedURI());
         
         List<URI> entityURIs = null;
         try {
-            String query = SparqlTemplate.instance().confirmEntityIds(idURIs);
+            String query = confirmEntityIds(idURIs);
             logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
 
             entityURIs = this.getRdfDao().queryForRdfResources(query);
@@ -357,7 +393,12 @@ public class EntitySummaryResource {
         
         List<URI> graphURIs = null;
         try {
-            String query = SparqlTemplate.instance().extractGraphContext(idURIs);
+          String query = ENTITY_QUERIES.render("extractGraphContext", new SparqlTemplate.Binder() {
+            @Override
+            public void bind(ST template) {
+              template.add("ids", idURIs);
+            }
+          });
             logger.debug("EntityResource PUT evidence performing SPARQL id-query:\n{}", query);
             graphURIs = this.getRdfDao().queryForRdfResources(query);
         } catch (MetadataRepositoryException e) {
@@ -378,9 +419,8 @@ public class EntitySummaryResource {
             logger.info("Bad request received. No rdf:type provided: {}", rdf);
             return badRequest("No rdf:type provided");
         }
-        URI uri = null;
         try {
-        	uri = new URI(id);
+          new URI(id);
         } catch (URISyntaxException em) {
             logger.warn("Error performing passing id as URI:{})", id);
             return internalError("Error performing update");
