@@ -1,17 +1,100 @@
 package net.qldarch.web.resource;
 
+import static com.google.common.base.Functions.toStringFunction;
+import static com.google.common.base.Optional.fromNullable;
+import static com.google.common.collect.Collections2.transform;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Sets.newHashSet;
+import static net.qldarch.web.service.KnownURIs.QAC_HAS_FILE_GRAPH;
+import static net.qldarch.web.service.KnownURIs.QA_BASIC_MIME_TYPE;
+import static net.qldarch.web.service.KnownURIs.QA_DATE_UPLOADED;
+import static net.qldarch.web.service.KnownURIs.QA_DIGITAL_FILE;
+import static net.qldarch.web.service.KnownURIs.QA_HAS_FILE_SIZE;
+import static net.qldarch.web.service.KnownURIs.QA_MANAGED_FILE;
+import static net.qldarch.web.service.KnownURIs.QA_SOURCE_FILENAME;
+import static net.qldarch.web.service.KnownURIs.QA_SYSTEM_LOCATION;
+import static net.qldarch.web.service.KnownURIs.QA_THUMBNAIL_FILE;
+import static net.qldarch.web.service.KnownURIs.QA_TRANSCRIPT_FILE;
+import static net.qldarch.web.service.KnownURIs.QA_UPLOADED_BY;
+import static net.qldarch.web.service.KnownURIs.QA_WEB_FILE;
+import static net.qldarch.web.service.KnownURIs.RDF_TYPE;
+
+import java.awt.geom.AffineTransform;
+import java.awt.image.AffineTransformOp;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+import javax.imageio.ImageIO;
+import javax.servlet.ServletContext;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+
 import net.coobird.thumbnailator.Thumbnails;
 import net.coobird.thumbnailator.geometry.Positions;
 import net.qldarch.av.parser.TranscriptParser;
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
 import net.qldarch.web.service.KnownPrefixes;
+import net.qldarch.web.service.KnownURIs;
 import net.qldarch.web.service.MetadataRepositoryException;
 import net.qldarch.web.service.RdfDataStoreDao;
+import net.qldarch.web.service.RepositoryOperation;
 import net.qldarch.web.util.SparqlToJsonString;
 
+import org.apache.commons.io.FilenameUtils;
+import org.apache.shiro.SecurityUtils;
+import org.apache.tika.Tika;
+import org.apache.tika.detect.DefaultDetector;
+import org.apache.tika.detect.Detector;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.Parser;
+import org.apache.tika.sax.BodyContentHandler;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.type.TypeReference;
+import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xml.sax.ContentHandler;
 
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.imaging.ImageProcessingException;
+import com.drew.metadata.MetadataException;
+import com.drew.metadata.exif.ExifIFD0Directory;
+import com.drew.metadata.jpeg.JpegDirectory;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -20,71 +103,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.sun.jersey.core.header.FormDataContentDisposition;
 import com.sun.jersey.multipart.FormDataParam;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.shiro.SecurityUtils;
-import org.apache.tika.Tika;
-import org.apache.tika.detect.DefaultDetector;
-import org.apache.tika.detect.Detector;
-import org.apache.tika.exception.TikaException;
-import org.apache.tika.metadata.Metadata;
-import org.apache.tika.parser.AutoDetectParser;
-import org.apache.tika.parser.ParseContext;
-import org.apache.tika.parser.Parser;
-import org.apache.tika.sax.BodyContentHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.xml.sax.ContentHandler;
-import org.xml.sax.SAXException;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Set;
-
-import javax.servlet.ServletContext;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.POST;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response.Status;
-
-import static com.google.common.base.Functions.toStringFunction;
-import static com.google.common.base.Optional.fromNullable;
-import static com.google.common.collect.Collections2.transform;
-import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Sets.newHashSet;
-import static net.qldarch.web.service.KnownURIs.*;
-
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
-import java.awt.image.BufferedImage;
-
-import javax.imageio.ImageIO;
-
-import com.drew.imaging.ImageMetadataReader;
-import com.drew.imaging.ImageProcessingException;
-import com.drew.metadata.MetadataException;
-import com.drew.metadata.exif.ExifIFD0Directory;
-import com.drew.metadata.jpeg.JpegDirectory;
 
 @Path("/file")
 public class FileSummaryResource {
@@ -243,11 +261,39 @@ public class FileSummaryResource {
         return Response.ok().entity(new SparqlToJsonString().performQuery(query)).build();
     }
 
+    private String getIdFromJson(String json) {
+      Map<String,String> map;
+      ObjectMapper mapper = new ObjectMapper();
+      try {
+        map = mapper.readValue(json, 
+            new TypeReference<HashMap<String,String>>(){});
+        return map.get("id");
+      } catch (Exception e) {}
+      return null;
+    }
+
+    private URI toUri(String s) {
+      try {
+        return URI.create(s);
+      } catch(Exception e ) {
+        return null;
+      }
+    }
+
+    private static Value value(String value) {
+      return new ValueFactoryImpl().createLiteral(value);
+    }
+
+    private static URIImpl uri(URI uri) {
+      return new URIImpl(uri.toString());
+    }
+
     @POST
     @Path("user")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
     public Response performPost(
+            @FormDataParam("myObj") String json,
             @FormDataParam("file") InputStream file,
             @FormDataParam("file") FormDataContentDisposition fileDis)
                 throws IOException, MetadataRepositoryException {
@@ -257,7 +303,7 @@ public class FileSummaryResource {
                     .entity("Permission Denied.")
                     .build();
         }
-        
+        final URI ownerUri = toUri(getIdFromJson(json));
         // Kludge so I can use curl to test.
         User user = new User("amuys");
 
@@ -268,20 +314,20 @@ public class FileSummaryResource {
         if (!userTmpDir.exists()) {
             userTmpDir.mkdirs();
         }
-
+        final long timestamp = System.currentTimeMillis();
         String filename = fileDis.getFileName();
         String basename = FilenameUtils.getBaseName(filename);
         String extension = FilenameUtils.getExtension(filename);
         String stripBase = basename.replaceAll("[^a-zA-Z0-9_]", "");
         String stripExt = extension.replaceAll("[^a-zA-Z0-9_]", "");
         File tmpFile = new File(userTmpDir, String.format("%s-%d-%s.%s",
-                    user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+                    user.getUsername(), timestamp, stripBase, stripExt));
         File destFile = new File(userFileDir, String.format("%s-%d-%s.%s",
-                    user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+                    user.getUsername(), timestamp, stripBase, stripExt));
         File fullFile = new File(userFileDir, String.format("full/%s-%d-%s.%s",
-                user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+                user.getUsername(), timestamp, stripBase, stripExt));
         File metaFile = new File(userFileDir, String.format("%s-%d-%s.%s.json",
-                    user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+                    user.getUsername(), timestamp, stripBase, stripExt));
 
         // Yes, this should be a URL, but Java doesn't permit conversion from relative URI to URL!
         String locationURI = destFile.toString().substring(this.archiveDir.toString().length() + 1);
@@ -294,6 +340,8 @@ public class FileSummaryResource {
         
         boolean isTranscript = (stripExt.toLowerCase().equals("doc") || stripExt.toLowerCase().equals("txt"));
         String transcriptLocationURI = "";
+        final File transcriptFile = new File(userFileDir, String.format("transcript/%s-%d-%s.%s.json",
+            user.getUsername(), timestamp, stripBase, stripExt));
         if (isTranscript) {
         	InputStream is = new FileInputStream(tmpFile);
         	PrintStream ps = null;
@@ -317,8 +365,6 @@ public class FileSummaryResource {
         		
             	TranscriptParser parser = new TranscriptParser(is);
                 parser.parse();
-            	File transcriptFile = new File(userFileDir, String.format("transcript/%s-%d-%s.%s.json",
-                        user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
             	ps = new PrintStream(new FileOutputStream(transcriptFile, false));
                 parser.printJson(ps);
                 
@@ -349,14 +395,14 @@ public class FileSummaryResource {
                 Files.copy(tmpFile.toPath(), fullFile.toPath());
                 
             	File webFile = new File(userFileDir, String.format("web/%s-%d-%s.thumbnail.%s",
-                        user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+                        user.getUsername(), timestamp, stripBase, stripExt));
             	
     			Thumbnails.of(tmpFile).crop(Positions.CENTER).size(800, 800).toFile(webFile);
                 
     			webFileLocationURI = webFile.toString().substring(this.archiveDir.toString().length() + 1);
 
             	File thumbnailFile = new File(userFileDir, String.format("thumbs/%s-%d-%s.thumbnail.%s",
-                        user.getUsername(), System.currentTimeMillis(), stripBase, stripExt));
+                        user.getUsername(), timestamp, stripBase, stripExt));
             	
     			Thumbnails.of(tmpFile).crop(Positions.CENTER).size(200, 200).toFile(thumbnailFile);
                 
@@ -411,9 +457,24 @@ public class FileSummaryResource {
         	
         String entity = null;
         try {
-            URI id = user.newId(userFileGraph, QA_DIGITAL_FILE);
+            final URI id = user.newId(userFileGraph, QA_DIGITAL_FILE);
             fileDesc.setURI(id);
             this.getRdfDao().insertRdfDescription(fileDesc, user, QAC_HAS_FILE_GRAPH, userFileGraph);
+            // if the uploaded file is a transcript connect it to the interview
+            if(isTranscript && (ownerUri != null)) {
+              getRdfDao().getConnectionPool().performOperation(new RepositoryOperation() {
+                @Override
+                public void perform(RepositoryConnection conn)
+                    throws RepositoryException, MetadataRepositoryException {
+                  Resource context = getContext(ownerUri, conn);
+                  // delete any old references to transcripts
+                  conn.remove(uri(ownerUri), uri(KnownURIs.HAS_TRANSCRIPT), null, context);
+                  conn.remove(uri(ownerUri), uri(KnownURIs.TRANSCRIPT_LOCATION), null, context);
+                  conn.add(uri(ownerUri), uri(KnownURIs.HAS_TRANSCRIPT), uri(id), context);
+                  conn.add(uri(ownerUri), uri(KnownURIs.TRANSCRIPT_LOCATION),
+                      value(webAccessiblePath(transcriptFile)), context);
+                }});
+            }
         } catch (MetadataRepositoryException em) {
             logger.warn("Error performing insertRdfDescription graph:" + userFileGraph + ", rdf:" + fileDesc + ")", em);
             return Response
@@ -429,6 +490,25 @@ public class FileSummaryResource {
         logger.trace("Returning successful entity: {}", entity);
 
         return Response.ok().entity(fileDesc).build();
+    }
+
+    private Resource getContext(URI subject, RepositoryConnection con) throws RepositoryException {
+      RepositoryResult<Statement> result = con.getStatements(uri(subject), null, null, true);
+      // assumes that the first statement has the context we are looking for.
+      // no idea if this is valid really.
+      if(result.hasNext()) {
+        return result.next().getContext();
+      } else {
+        return null;
+      }
+    }
+
+    // assumes that the archiveDir (ends in files currently) is web accessible.
+    // hopefully that does not change!
+    private String webAccessiblePath(File location) {
+      String p = location.getAbsolutePath().substring(
+          (int)this.archiveDir.getAbsolutePath().length());
+      return "/" + FilenameUtils.getName(this.archiveDir.getAbsolutePath()) + p;
     }
 
     public void autoRotateImage(String path, String extension) {

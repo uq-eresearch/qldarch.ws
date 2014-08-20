@@ -61,4 +61,9 @@ public interface KnownURIs {
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#dateUploaded");
     public static final URI QA_MANAGED_FILE = 
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#managedFile");
+
+    public static final URI HAS_TRANSCRIPT = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#hasTranscript");
+    public static final URI TRANSCRIPT_LOCATION = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#transcriptLocation");
 }
