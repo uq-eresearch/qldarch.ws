@@ -66,4 +66,19 @@ public interface KnownURIs {
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#hasTranscript");
     public static final URI TRANSCRIPT_LOCATION = 
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#transcriptLocation");
+
+    public static final URI OBJECT = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#object");
+    public static final URI RELATED_TO_RELATION = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#RelatedToRelation");
+    public static final URI SUBJECT = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#subject");
+    public static final URI PREDICATE = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#predicate");
+    public static final URI RELATED_TO = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#relatedTo");
+    public static final URI ASSOCIATED_FIRM = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#associatedFirm");
+    public static final URI ASSOCIATED_ARCHITECT = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#associatedArchitect");
 }

@@ -230,4 +230,8 @@ public class RdfDataStoreDao {
         }
         return this.ontology;
     }
+
+    public <T> T execute(RepositoryQuery<T> query) throws MetadataRepositoryException {
+      return this.getConnectionPool().performQuery(query);
+    }
 }

@@ -68,7 +68,7 @@ public class ExpressionResource {
     
     private RdfDataStoreDao rdfDao;
 
-    public static String queryByTypes(Collection<URI> types, boolean summary) {
+    private static String queryByTypes(Collection<URI> types, boolean summary) {
         if (types.size() < 1) {
             throw new IllegalArgumentException("Empty type collection passed to queryByTypes()");
         }
@@ -108,7 +108,7 @@ public class ExpressionResource {
 
         String query = String.format(baseQuery, (summary ? summaryRestriction : ""));
 
-        logger.debug("ExpressionResource performing SPARQL query: {}", query);
+        logger.debug("queryByTypes performing SPARQL query: {}", query);
 
         return query;
     }
@@ -245,7 +245,7 @@ public class ExpressionResource {
 
         String query = String.format(baseQuery, (summary ? summaryRestriction : ""));
 
-        logger.debug("ExpressionResource performing SPARQL query: {}", query);
+        logger.debug("queryByIds performing SPARQL query: {}", query);
 
         return query;
     }
