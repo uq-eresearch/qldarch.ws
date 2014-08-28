@@ -400,8 +400,8 @@ public class QldarchOntology {
                         return new URIImpl(object.toString());
                     }
                 } catch (IllegalArgumentException ei) {
-                    logger.debug("ObjectProperty value({}) could not be converted to URI",
-                            object, ei);
+                    logger.debug("ObjectProperty value ({}) could not be converted to URI,"
+                        + " returning literal instead", object);
                     return new LiteralImpl(object.toString());
                 }
             } else {
