@@ -1,5 +1,8 @@
 package net.qldarch.web.resource;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 import java.util.List;
 
 import javax.ws.rs.DefaultValue;
@@ -104,14 +107,6 @@ public class RdfResource {
     public Resource getSubject() {
       throw new RuntimeException("not supported");
     }
-  }
-
-  private static boolean isBlank(String s) {
-    return s == null || "".equals(s);
-  }
-
-  private static boolean isNotBlank(String s) {
-    return !isBlank(s);
   }
 
   private static String chopAngle(String s) {
