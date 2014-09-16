@@ -81,4 +81,12 @@ public interface KnownURIs {
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#associatedFirm");
     public static final URI ASSOCIATED_ARCHITECT = 
         URI.create("http://qldarch.net/ns/rdf/2012-06/terms#associatedArchitect");
+    public static final URI WORKED_ON = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#workedOn");
+    public static final URI WORKED_ON_RELATION = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#WorkedOnRelation");
+    public static final URI COMPLETION_DATE = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#completionDate");
+    public static final URI START_DATE = 
+        URI.create("http://qldarch.net/ns/rdf/2012-06/terms#startDate");
 }

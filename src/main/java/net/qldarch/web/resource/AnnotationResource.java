@@ -4,6 +4,7 @@ import static com.google.common.collect.Collections2.transform;
 import static com.google.common.collect.Sets.newHashSet;
 import static net.qldarch.web.service.KnownURIs.ASSOCIATED_ARCHITECT;
 import static net.qldarch.web.service.KnownURIs.ASSOCIATED_FIRM;
+import static net.qldarch.web.service.KnownURIs.COMPLETION_DATE;
 import static net.qldarch.web.service.KnownURIs.OBJECT;
 import static net.qldarch.web.service.KnownURIs.PREDICATE;
 import static net.qldarch.web.service.KnownURIs.QAC_HAS_ANNOTATION_GRAPH;
@@ -11,13 +12,15 @@ import static net.qldarch.web.service.KnownURIs.QA_ASSERTED_BY;
 import static net.qldarch.web.service.KnownURIs.QA_ASSERTION_DATE;
 import static net.qldarch.web.service.KnownURIs.QA_EVIDENCE;
 import static net.qldarch.web.service.KnownURIs.RDF_TYPE;
-import static net.qldarch.web.service.KnownURIs.RELATED_TO;
-import static net.qldarch.web.service.KnownURIs.RELATED_TO_RELATION;
+import static net.qldarch.web.service.KnownURIs.START_DATE;
 import static net.qldarch.web.service.KnownURIs.SUBJECT;
+import static net.qldarch.web.service.KnownURIs.WORKED_ON;
+import static net.qldarch.web.service.KnownURIs.WORKED_ON_RELATION;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -145,6 +148,27 @@ public class AnnotationResource {
       return new ValueFactoryImpl().createLiteral(literal);
     }
 
+    private String year(String date) {
+      try {
+        return new SimpleDateFormat("yyyy").format(
+            new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX").parse(date));
+      } catch(Exception e) {
+        return date;
+      }
+    }
+
+    private String getCompletionDate(final String structure) throws MetadataRepositoryException {
+      return year(getRdfDao().execute(new RepositoryQuery<String>() {
+        @Override
+        public String query(RepositoryConnection con)
+            throws RepositoryException, MetadataRepositoryException {
+          
+          RepositoryResult<Statement> result =  con.getStatements(
+              uri(structure), uri(COMPLETION_DATE), null, true);
+          return result.hasNext()?result.next().getObject().stringValue():null;
+        }}));
+    }
+
     private void addStructures(final PGraph pgraph, final String s) {
       try {
         List<String> structures = getRdfDao().execute(new RepositoryQuery<List<String>>() {
@@ -171,10 +195,14 @@ public class AnnotationResource {
         for(String structure : structures) {
           Map<String, List<Value>> pMap = Maps.newHashMap();
           pMap.put(OBJECT.toString(), lof(structure));
-          pMap.put(RDF_TYPE.toString(), lof(RELATED_TO_RELATION.toString()));
+          pMap.put(RDF_TYPE.toString(), lof(WORKED_ON_RELATION.toString()));
           pMap.put(SUBJECT.toString(), lof(s));
-          pMap.put(PREDICATE.toString(), lof(RELATED_TO.toString()));
+          pMap.put(PREDICATE.toString(), lof(WORKED_ON.toString()));
           pMap.put("implicit", lof(value("true")));
+          String cdate = getCompletionDate(structure);
+          if(cdate != null) {
+            pMap.put(START_DATE.toString(), lof(value(cdate)));
+          }
           pgraph.put(structure, pMap);
         }
       } catch(Exception e) {}
@@ -203,13 +231,17 @@ public class AnnotationResource {
             }
             return l;
           }});
+        String cdate = getCompletionDate(o);
         for(String relation : rs) {
           Map<String, List<Value>> pMap = Maps.newHashMap();
           pMap.put(OBJECT.toString(), lof(o));
-          pMap.put(RDF_TYPE.toString(), lof(RELATED_TO_RELATION.toString()));
+          pMap.put(RDF_TYPE.toString(), lof(WORKED_ON_RELATION.toString()));
           pMap.put(SUBJECT.toString(), lof(relation));
-          pMap.put(PREDICATE.toString(), lof(RELATED_TO.toString()));
+          pMap.put(PREDICATE.toString(), lof(WORKED_ON.toString()));
           pMap.put("implicit", lof(value("true")));
+          if(cdate != null) {
+            pMap.put(START_DATE.toString(), lof(value(cdate)));
+          }
           pgraph.put(relation, pMap);
         }
       } catch(Exception e) {}
