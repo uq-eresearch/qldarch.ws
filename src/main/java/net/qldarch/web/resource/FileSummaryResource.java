@@ -22,14 +22,10 @@ import static net.qldarch.web.service.KnownURIs.RDF_TYPE;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -56,7 +52,6 @@ import javax.ws.rs.core.Response.Status;
 
 import net.coobird.thumbnailator.Thumbnails;
 import net.coobird.thumbnailator.geometry.Positions;
-import net.qldarch.av.parser.TranscriptParser;
 import net.qldarch.web.model.RdfDescription;
 import net.qldarch.web.model.User;
 import net.qldarch.web.service.KnownPrefixes;
@@ -64,18 +59,13 @@ import net.qldarch.web.service.KnownURIs;
 import net.qldarch.web.service.MetadataRepositoryException;
 import net.qldarch.web.service.RdfDataStoreDao;
 import net.qldarch.web.service.RepositoryOperation;
+import net.qldarch.web.transcript.ParseResult;
+import net.qldarch.web.transcript.Transcripts;
 import net.qldarch.web.util.SparqlToJsonString;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.shiro.SecurityUtils;
 import org.apache.tika.Tika;
-import org.apache.tika.detect.DefaultDetector;
-import org.apache.tika.detect.Detector;
-import org.apache.tika.metadata.Metadata;
-import org.apache.tika.parser.AutoDetectParser;
-import org.apache.tika.parser.ParseContext;
-import org.apache.tika.parser.Parser;
-import org.apache.tika.sax.BodyContentHandler;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 import org.openrdf.model.Resource;
@@ -88,7 +78,6 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xml.sax.ContentHandler;
 
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.imaging.ImageProcessingException;
@@ -109,7 +98,6 @@ public class FileSummaryResource {
     public static Logger logger = LoggerFactory.getLogger(FileSummaryResource.class);
     public static final String XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
 
-    private ServletContext context;
     private File archiveDir;
     private RdfDataStoreDao rdfDao;
 
@@ -142,7 +130,6 @@ public class FileSummaryResource {
         logger.trace("Setting servlet context");
         logger.trace("  init-names: {}",
                 newArrayList(Iterators.forEnumeration(context.getInitParameterNames())));
-        this.context = context;
         String archiveDirStr = context.getInitParameter("net.qldarch.context.archivedir");
         if (archiveDirStr == null) {
             logger.warn("InitParam net.qldarch.context.archivedir not set");
@@ -288,6 +275,18 @@ public class FileSummaryResource {
       return new URIImpl(uri.toString());
     }
 
+    private String parseTranscript(File tmpFile, File transcriptFile) throws Exception {
+      try(PrintStream ps = new PrintStream(new FileOutputStream(transcriptFile, false))) {
+        ParseResult pr = Transcripts.parse(tmpFile);
+        if(pr.ok()) {
+          ps.print(pr.json());
+        } else {
+          throw new Exception(pr.msg(), pr.cause());
+        }
+        return transcriptFile.toString().substring(this.archiveDir.toString().length() + 1);
+      }
+    }
+
     @POST
     @Path("user")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -342,49 +341,17 @@ public class FileSummaryResource {
         String transcriptLocationURI = "";
         final File transcriptFile = new File(userFileDir, String.format("transcript/%s-%d-%s.%s.json",
             user.getUsername(), timestamp, stripBase, stripExt));
+        String message = null;
         if (isTranscript) {
-        	InputStream is = new FileInputStream(tmpFile);
-        	PrintStream ps = null;
-        	try {
-        		if (stripExt.toLowerCase().equals("doc")) {
-            		ParseContext c = new ParseContext();
-            		Detector detector = new DefaultDetector();
-                    Parser p = new AutoDetectParser(detector);
-                    c.set(Parser.class, p);
-                    OutputStream outputstream = new ByteArrayOutputStream();
-                    Metadata metadata = new Metadata();
-            		
-            		ContentHandler handler = new BodyContentHandler(outputstream);
-                    p.parse(is, handler, metadata, c); 
-                    
-                    String docText = outputstream.toString();
-                    is.close();
-                    
-                	is = new ByteArrayInputStream(docText.getBytes());
-            	}
-        		
-            	TranscriptParser parser = new TranscriptParser(is);
-                parser.parse();
-            	ps = new PrintStream(new FileOutputStream(transcriptFile, false));
-                parser.printJson(ps);
-                
-                transcriptLocationURI = transcriptFile.toString().substring(this.archiveDir.toString().length() + 1);
-            } catch (Exception ei) {
-            	ei.printStackTrace();
-            	isTranscript = false;
-            } finally {
-                is.close();
-                try {
-                	if (ps != null) {
-                		ps.flush();
-                		ps.close();
-                	}
-                } catch (Exception e) {
-                	e.printStackTrace();
-                }
-            }
+          try {
+            transcriptLocationURI = parseTranscript(tmpFile, transcriptFile);
+          } catch(Exception e) {
+            logger.warn(String.format("parsing transcript '%s' (%s) failed",
+                tmpFile.getAbsolutePath(), destFile.getAbsolutePath()), e);
+            message = e.getMessage();
+            isTranscript = false;
+          }
         }
-        
         boolean isImage = (stripExt.toLowerCase().equals("jpg") || 
         		stripExt.toLowerCase().equals("jpeg") || stripExt.toLowerCase().equals("png") || 
         		stripExt.toLowerCase().equals("gif") || stripExt.toLowerCase().equals("bmp"));
@@ -488,7 +455,9 @@ public class FileSummaryResource {
         }
 
         logger.trace("Returning successful entity: {}", entity);
-
+        if(message != null) {
+          fileDesc.addProperty("msg", message);
+        }
         return Response.ok().entity(fileDesc).build();
     }
 

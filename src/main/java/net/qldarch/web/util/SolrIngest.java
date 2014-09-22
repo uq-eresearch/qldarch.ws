@@ -1,10 +1,7 @@
 package net.qldarch.web.util;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -12,25 +9,15 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLConnection;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 
-import javax.servlet.ServletContext;
-
-import net.qldarch.av.parser.TranscriptParser;
-import net.qldarch.web.resource.ExpressionResource;
 import net.qldarch.web.service.RdfDataStoreDao;
+import net.qldarch.web.transcript.ParseResult;
+import net.qldarch.web.transcript.Transcripts;
+import net.qldarch.web.transcript.Utterance;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.tika.detect.DefaultDetector;
-import org.apache.tika.detect.Detector;
-import org.apache.tika.metadata.Metadata;
-import org.apache.tika.parser.AutoDetectParser;
-import org.apache.tika.parser.ParseContext;
-import org.apache.tika.parser.Parser;
-import org.apache.tika.sax.BodyContentHandler;
 import org.dom4j.Document;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
@@ -38,7 +25,6 @@ import org.dom4j.io.OutputFormat;
 import org.dom4j.io.XMLWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xml.sax.ContentHandler;
 
 import com.google.common.io.CharStreams;
 
@@ -151,7 +137,7 @@ public class SolrIngest {
         }
 	}
 	
-	public static void ingestTranscript(URI resource) {		
+	public static void ingestTranscript(URI resource) {
 		RdfDataStoreDao rdfDao = new RdfDataStoreDao();
 		try {
 			String query =  "SELECT ?s ?source " + 
@@ -165,52 +151,26 @@ public class SolrIngest {
 	
 			Map<String, String> article = rdfDao.queryForRdfResource(query, 
 					Arrays.asList("source"));
-			
-        	InputStream is = new FileInputStream(
-        			"/var/www/html/files/" + article.get("source").replace("\"", ""));
-        	
-        	if (article.get("source").toString().replace("\"", "").endsWith(".doc")) {
-        		try {
-	        		ParseContext c = new ParseContext();
-	        		Detector detector = new DefaultDetector();
-	                Parser p = new AutoDetectParser(detector);
-	                c.set(Parser.class, p);
-	                OutputStream outputstream = new ByteArrayOutputStream();
-	                Metadata metadata = new Metadata();
-	        		
-	        		ContentHandler handler = new BodyContentHandler(outputstream);
-	                p.parse(is, handler, metadata, c); 
-	                is.close();
-	                
-	                String docText = outputstream.toString();
-	                
-	            	is = new ByteArrayInputStream(docText.getBytes());
-        		} catch (Exception e) { 
-                	e.printStackTrace();
-                	return;
-        		}
+        	ParseResult pr = Transcripts.parse(
+        	    new File("/var/www/html/files/" + article.get("source").replace("\"", "")));
+        	if(!pr.ok()) {
+        	  throw new Exception(pr.msg(), pr.cause());
         	}
-        	
-        	TranscriptParser parser = new TranscriptParser(is);
         	Document document = DocumentHelper.createDocument();
-        	 
-            parser.parse();
-        	
             Element root = document.addElement("add")
                 .addAttribute("commitWithin", "30000")
                 .addAttribute("overwrite", "true");
-            
-            for (TranscriptParser.Utterance entry : parser.getInterview()) {
+            for (Utterance utterance : pr.transcript().getExchanges()) {
                 Element doc = root.addElement("doc");
                 doc.addElement("field")
                     .addAttribute("name", "id")
-                    .addText(resource.toString() + "#" + entry.getTimestamp());
+                    .addText(resource.toString() + "#" + utterance.getTime());
                 doc.addElement("field")
                     .addAttribute("name", "interview")
                     .addText(resource.toString());
                 doc.addElement("field")
                     .addAttribute("name", "transcript")
-                    .addText(entry.getUtterance());
+                    .addText(utterance.getTranscript());
             }
 
             File temp = new File(
