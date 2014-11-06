@@ -169,6 +169,6 @@ public class SparqlToJsonString {
 
     private String cleanString(String in) {
         return in.replaceAll("\n", "").replaceAll("\r", "").replaceAll("\\\\", "\\\\\\\\")
-        		.replaceAll("\"", "\\\\\"").trim(); 
+            .replaceAll("\"", "\\\\\"").replaceAll("\t", "").trim();
     }
 }
